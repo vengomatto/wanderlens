@@ -32,15 +32,15 @@ the catalog does not depend on a live external geo API.
 
 ### Requirement: Enrich destinations with descriptive text
 The system SHALL attach a short natural-language description to each candidate
-Destination, drawn from a Wikimedia source, so ranking text is meaningful rather
-than a bare place name.
+Destination, drawn from a configurable chain of Description Providers, so ranking
+text is meaningful rather than a bare place name.
 
 #### Scenario: Description is attached
 - **WHEN** a candidate Destination is enriched
 - **THEN** it carries a short descriptive text in addition to its name and country
 
 #### Scenario: No description available
-- **WHEN** no Wikimedia description can be found for a candidate
+- **WHEN** no provider returns a description for a candidate
 - **THEN** the Destination keeps its name and country and remains usable
 
 ### Requirement: Descriptions are cached locally
@@ -49,8 +49,42 @@ once and subsequent runs work without network access.
 
 #### Scenario: Cache avoids refetch
 - **WHEN** the catalog is loaded from a previously enriched cache
-- **THEN** no Wikimedia request is made
+- **THEN** no provider request is made
 
 #### Scenario: Offline reuse
 - **WHEN** the host has no network access and an enriched cache exists
 - **THEN** recommendations still run using the cached descriptions
+
+### Requirement: Pluggable description providers
+The system SHALL obtain descriptions through interchangeable Description
+Providers used in a configured order, so Wikimedia is one option rather than the
+only source.
+
+#### Scenario: First provider wins
+- **WHEN** an earlier provider in the chain returns a non-empty description
+- **THEN** later providers are not called for that Destination
+
+#### Scenario: Fallback on empty or failure
+- **WHEN** a provider returns nothing or errors
+- **THEN** the next provider in the chain is tried
+
+#### Scenario: New provider without caller changes
+- **WHEN** a new Description Provider is registered
+- **THEN** enrichment uses it without changes to the enrichment caller
+
+### Requirement: OpenStreetMap feature provider
+The system SHALL be able to derive a Destination's descriptive attributes from
+OpenStreetMap tags, using a free, keyless OSM service.
+
+#### Scenario: Features resolved
+- **WHEN** a place resolves in OpenStreetMap with tags such as coastline, beach,
+  harbour, or historic
+- **THEN** the Destination gains descriptive feature text naming those attributes
+
+#### Scenario: Place not found
+- **WHEN** OpenStreetMap has no match for the place
+- **THEN** the provider returns nothing and the chain continues
+
+#### Scenario: No API key or fee
+- **WHEN** the OpenStreetMap provider is used
+- **THEN** it requires no API key and incurs no per-request search fee
