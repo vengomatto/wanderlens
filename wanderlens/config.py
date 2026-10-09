@@ -18,7 +18,7 @@ class Config:
     vlm_model: str
     api_key: Optional[str]
     description_providers: list[str] = field(default_factory=lambda: ["wikimedia", "llm"])
-    llm_model: str = "openai/gpt-4o-mini:online"
+    llm_model: str = "meta-llama/llama-3.1-8b-instruct"
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -85,5 +85,5 @@ def load_config(
         description_providers=description_providers,
         llm_model=values.get("llm_model")
         or env.get("WANDERLENS_LLM_MODEL")
-        or "openai/gpt-4o-mini:online",
+        or "meta-llama/llama-3.1-8b-instruct",
     )
