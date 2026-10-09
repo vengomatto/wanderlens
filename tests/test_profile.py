@@ -122,3 +122,19 @@ def test_show_profile_reports_factors(tmp_path):
     assert "Italy" in text
     assert "coastal cliffs" in text
     assert "Trips: 2" in text
+
+
+def test_tagging_is_idempotent(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)
+    vision = FakeVision(["coastal cliffs"])
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+    calls = vision.calls
+    assert calls > 0
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+    assert vision.calls == calls, "tagging should be cached and not re-sent"
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy, retag=True)
+    assert vision.calls > calls

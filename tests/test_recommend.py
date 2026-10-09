@@ -34,6 +34,15 @@ class FakeEmbedder:
         return np.array([1.0, 0.0, 0.0], dtype=np.float32)
 
 
+class CountingEmbedder(FakeEmbedder):
+    def __init__(self):
+        self.text_calls = 0
+
+    def embed_text(self, text):
+        self.text_calls += 1
+        return super().embed_text(text)
+
+
 class FakeRanker:
     def rank(self, recommendations, profile):
         for rank, rec in enumerate(recommendations, start=1):
@@ -130,6 +139,19 @@ def test_run_recommend_end_to_end(tmp_path):
     conn = sqlite3.connect(config.db_path)
     stored = conn.execute("SELECT COUNT(*) FROM recommendations").fetchone()[0]
     assert stored == len(recs)
+
+
+def test_destination_embeddings_are_cached(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+    embedder = CountingEmbedder()
+
+    run_recommend(config, count=5, embedder=embedder, catalog=catalog)
+    first = embedder.text_calls
+    assert first == len(DESTINATIONS)
+
+    run_recommend(config, count=5, embedder=embedder, catalog=catalog)
+    assert embedder.text_calls == first, "destination embeddings should be cached"
 
 
 def test_run_recommend_without_embeddings_returns_empty(tmp_path):
