@@ -22,6 +22,7 @@ class Config:
     )
     llm_model: str = "meta-llama/llama-3.1-8b-instruct"
     exclude_radius_km: float = 60.0
+    catalog_source: str = "wikivoyage"
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -92,4 +93,7 @@ def load_config(
         exclude_radius_km=float(
             values.get("exclude_radius_km") or env.get("WANDERLENS_EXCLUDE_RADIUS_KM") or 60.0
         ),
+        catalog_source=values.get("catalog_source")
+        or env.get("WANDERLENS_CATALOG_SOURCE")
+        or "wikivoyage",
     )

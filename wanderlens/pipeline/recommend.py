@@ -98,32 +98,60 @@ def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> Tast
     return TasteProfile(user_id=user_id, geography=geography, tags=tags, embedding=embedding)
 
 
-def default_catalog(
-    config, limit: int = 150, enrich: bool = True, providers=None
+def _geonames_catalog(
+    config, country_codes, limit: int, min_population: int = 50000, providers=None
 ) -> JsonCatalog:
-    cache = config.catalog_path / "destinations.json"
-    if cache.exists():
-        return JsonCatalog.load(cache)
     cities = config.catalog_path / "cities500.txt"
     if not cities.exists():
         return JsonCatalog([])
     countries = config.catalog_path / "countryInfo.txt"
     records = load_geonames_cities(
         cities,
-        country_codes=DEFAULT_CANDIDATE_COUNTRIES,
-        min_population=50000,
+        country_codes=country_codes,
+        min_population=min_population,
         limit=limit,
         countries_path=countries if countries.exists() else None,
     )
-    if enrich:
-        if providers is None:
-            from wanderlens.catalog.providers import build_provider_chain
+    if providers is None:
+        from wanderlens.catalog.providers import build_provider_chain
 
-            providers = build_provider_chain(config)
-        enrich_records(records, providers=providers)
-    catalog = build_catalog({"geonames": records})
+        providers = build_provider_chain(config)
+    enrich_records(records, providers=providers)
+    return build_catalog({"geonames": records})
+
+
+def build_catalog_for(
+    config, country_codes, cache_path, providers=None, limit: int = 300, min_population: int = 50000
+) -> JsonCatalog:
+    """Build (and cache) the recommendation catalog for the given country codes.
+
+    Uses the Wikivoyage travel catalog by default, falling back to GeoNames.
+    """
+    cache = config.catalog_path / cache_path
+    if cache.exists():
+        return JsonCatalog.load(cache)
+
+    if getattr(config, "catalog_source", "wikivoyage") == "wikivoyage":
+        from wanderlens.catalog.fetch import country_names_for_codes
+        from wanderlens.catalog.wikivoyage import build_wikivoyage_catalog
+
+        names = country_names_for_codes(config.catalog_path / "countryInfo.txt", country_codes)
+        catalog = build_wikivoyage_catalog(list(names.values()))
+        if len(catalog):
+            catalog.save(cache)
+            return catalog
+
+    catalog = _geonames_catalog(config, country_codes, limit, min_population, providers)
     catalog.save(cache)
     return catalog
+
+
+def default_catalog(
+    config, limit: int = 150, enrich: bool = True, providers=None
+) -> JsonCatalog:
+    return build_catalog_for(
+        config, DEFAULT_CANDIDATE_COUNTRIES, "destinations.json", providers=providers, limit=limit
+    )
 
 
 def run_recommend(

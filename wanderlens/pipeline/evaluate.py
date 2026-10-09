@@ -4,12 +4,7 @@ from collections import Counter
 from typing import Optional
 
 from wanderlens.catalog.destinations import JsonCatalog
-from wanderlens.catalog.fetch import (
-    build_catalog,
-    country_code_for_name,
-    enrich_records,
-    load_geonames_cities,
-)
+from wanderlens.catalog.fetch import country_code_for_name
 from wanderlens.core.evaluate import evaluate_resurfacing
 from wanderlens.core.recommend import (
     filter_unvisited_proximity,
@@ -19,6 +14,7 @@ from wanderlens.core.recommend import (
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.recommend import (
     DEFAULT_CANDIDATE_COUNTRIES,
+    build_catalog_for,
     ensure_destination_embeddings,
     load_profile,
     load_taste_embedding,
@@ -29,42 +25,20 @@ EVAL_MIN_POPULATION = 10000
 
 
 def _eval_catalog(config, holdout_country: str, providers=None) -> JsonCatalog:
-    cache = config.catalog_path / f"destinations_eval_{holdout_country.lower()}.json"
-    if cache.exists():
-        return JsonCatalog.load(cache)
-
-    cities = config.catalog_path / "cities500.txt"
-    if not cities.exists():
-        return JsonCatalog([])
     country_names = config.catalog_path / "countryInfo.txt"
-    countries_path = country_names if country_names.exists() else None
-
-    records = load_geonames_cities(
-        cities,
-        country_codes=DEFAULT_CANDIDATE_COUNTRIES,
-        min_population=EVAL_MIN_POPULATION,
+    codes = list(DEFAULT_CANDIDATE_COUNTRIES)
+    if holdout_country:
+        code = country_code_for_name(country_names, holdout_country)
+        if code and code not in codes:
+            codes.append(code)
+    return build_catalog_for(
+        config,
+        codes,
+        f"destinations_eval_{holdout_country.lower() or 'default'}.json",
+        providers=providers,
         limit=300,
-        countries_path=countries_path,
-    )
-    holdout_code = (
-        country_code_for_name(country_names, holdout_country)
-        if country_names.exists() and holdout_country
-        else None
-    )
-    records += load_geonames_cities(
-        cities,
-        country_codes=[holdout_code] if holdout_code else None,
         min_population=EVAL_MIN_POPULATION,
-        countries_path=countries_path,
     )
-    if providers is None:
-        from wanderlens.catalog.providers import build_provider_chain
-
-        providers = build_provider_chain(config)
-    enrich_records(records, providers=providers)
-    catalog = build_catalog({"geonames": records})
-    catalog.save(cache)
-    return catalog
 
 
 def _attribute_weights_excluding(conn, user_id: int, exclude_trip_id: int, total_trips: int) -> dict:

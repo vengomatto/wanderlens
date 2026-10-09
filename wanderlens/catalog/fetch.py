@@ -96,6 +96,22 @@ def enrich_records(records: list[dict], providers=None, delay: float = 0.0) -> l
     return records
 
 
+def country_names_for_codes(countries_path: str | Path, codes) -> dict[str, str]:
+    """Map GeoNames country codes (e.g. 'ES') to country names ('Spain')."""
+    wanted = {code.upper() for code in codes}
+    result: dict[str, str] = {}
+    path = Path(countries_path)
+    if not path.exists():
+        return result
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        cols = line.split("\t")
+        if len(cols) >= 5 and cols[0].upper() in wanted:
+            result[cols[0].upper()] = cols[4]
+    return result
+
+
 def country_code_for_name(countries_path: str | Path, name: str) -> Optional[str]:
     """Map a country name (e.g. 'Malta') to its GeoNames code ('MT')."""
     path = Path(countries_path)
