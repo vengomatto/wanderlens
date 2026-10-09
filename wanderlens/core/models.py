@@ -35,6 +35,7 @@ class Destination:
     country: str = ""
     attributes: list[str] = field(default_factory=list)
     description: str = ""
+    granularity: str = ""
 
 
 @dataclass

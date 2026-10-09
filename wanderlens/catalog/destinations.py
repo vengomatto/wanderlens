@@ -16,6 +16,7 @@ def destination_to_dict(destination: Destination) -> dict:
         "country": destination.country,
         "attributes": list(destination.attributes),
         "description": destination.description,
+        "granularity": destination.granularity,
     }
 
 
@@ -28,6 +29,7 @@ def destination_from_dict(data: dict) -> Destination:
         country=data.get("country", ""),
         attributes=list(data.get("attributes", [])),
         description=data.get("description", ""),
+        granularity=data.get("granularity", ""),
     )
 
 
