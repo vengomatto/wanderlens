@@ -21,6 +21,7 @@ class Config:
         default_factory=lambda: ["wikimedia", "openstreetmap", "llm"]
     )
     llm_model: str = "meta-llama/llama-3.1-8b-instruct"
+    exclude_radius_km: float = 60.0
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -88,4 +89,7 @@ def load_config(
         llm_model=values.get("llm_model")
         or env.get("WANDERLENS_LLM_MODEL")
         or "meta-llama/llama-3.1-8b-instruct",
+        exclude_radius_km=float(
+            values.get("exclude_radius_km") or env.get("WANDERLENS_EXCLUDE_RADIUS_KM") or 60.0
+        ),
     )

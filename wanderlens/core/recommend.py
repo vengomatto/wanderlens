@@ -5,7 +5,27 @@ from typing import Callable, Iterable, Optional
 import numpy as np
 
 from wanderlens.core.models import Destination, Recommendation, TasteProfile
+from wanderlens.core.taste import haversine_km
 from wanderlens.core.vocabulary import canonicalize
+
+
+def filter_unvisited_proximity(
+    destinations: Iterable[Destination],
+    centers: Iterable[tuple[float, float]],
+    radius_km: float,
+) -> list[Destination]:
+    """Keep Destinations farther than ``radius_km`` from every visited center."""
+    centers = list(centers)
+    if not centers:
+        return list(destinations)
+    kept: list[Destination] = []
+    for destination in destinations:
+        if all(
+            haversine_km(destination.lat, destination.lon, clat, clon) > radius_km
+            for clat, clon in centers
+        ):
+            kept.append(destination)
+    return kept
 
 
 def taste_attribute_weights(tags: dict[str, float]) -> dict[str, float]:
@@ -47,7 +67,7 @@ def destination_text(destination: Destination) -> str:
 
 
 def rank_destinations(
-    taste: np.ndarray,
+    taste: Optional[np.ndarray],
     destinations: Iterable[Destination],
     embed_text: Optional[Callable[[str], np.ndarray]] = None,
     exclude_countries: Iterable[str] = (),
@@ -55,13 +75,16 @@ def rank_destinations(
     vectors: Optional[dict] = None,
     taste_tags: Optional[dict[str, float]] = None,
     alpha: float = 0.5,
+    taste_facets: Optional[list] = None,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
     ``vectors`` (destination id -> embedding) lets callers supply cached
     embeddings; missing entries fall back to ``embed_text(destination_text(...))``.
     When ``taste_tags`` is given, the score blends embedding similarity
-    (``alpha``) with a canonical-attribute match (``1 - alpha``).
+    (``alpha``) with a canonical-attribute match (``1 - alpha``). When
+    ``taste_facets`` is given, the embedding score is the best match over the
+    per-trip facets (max), so distinct tastes are not averaged away.
     """
     excluded = {c.lower() for c in exclude_countries}
     scored: list[tuple[float, float, float, Destination]] = []
@@ -74,7 +97,12 @@ def rank_destinations(
             if embed_text is None:
                 raise ValueError("embed_text is required when embeddings are not cached")
             vector = embed_text(destination_text(destination))
-        embedding_score = float(np.dot(taste, vector))
+        if taste_facets:
+            embedding_score = max(float(np.dot(facet, vector)) for facet in taste_facets)
+        elif taste is not None:
+            embedding_score = float(np.dot(taste, vector))
+        else:
+            embedding_score = 0.0
         if taste_tags:
             attribute_score = _attribute_match(taste_tags, destination)
             score = alpha * embedding_score + (1.0 - alpha) * attribute_score
