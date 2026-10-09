@@ -17,7 +17,9 @@ class Config:
     vlm_provider: str
     vlm_model: str
     api_key: Optional[str]
-    description_providers: list[str] = field(default_factory=lambda: ["wikimedia", "llm"])
+    description_providers: list[str] = field(
+        default_factory=lambda: ["wikimedia", "openstreetmap", "llm"]
+    )
     llm_model: str = "meta-llama/llama-3.1-8b-instruct"
 
     def ensure_dirs(self) -> None:
@@ -65,7 +67,7 @@ def load_config(
     providers_raw = (
         values.get("description_providers")
         or env.get("WANDERLENS_DESCRIPTION_PROVIDERS")
-        or ["wikimedia", "llm"]
+        or ["wikimedia", "openstreetmap", "llm"]
     )
     if isinstance(providers_raw, str):
         description_providers = [p.strip() for p in providers_raw.split(",") if p.strip()]
