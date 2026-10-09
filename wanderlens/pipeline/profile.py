@@ -127,6 +127,7 @@ def run_profile(
     vision=None,
     reverse_geocoder: Optional[ReverseGeocoder] = None,
     sample_per_trip: int = 3,
+    retag: bool = False,
 ) -> list[Trip]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -148,7 +149,12 @@ def run_profile(
     _embed_photos(conn, user_id, photos, embedder)
 
     if vision is not None:
-        _store_subjects(conn, user_id, trips, vision, sample_per_trip)
+        existing_subjects = conn.execute(
+            "SELECT COUNT(*) FROM profile_entries WHERE user_id = ? AND factor = 'subjects'",
+            (user_id,),
+        ).fetchone()[0]
+        if retag or existing_subjects == 0:
+            _store_subjects(conn, user_id, trips, vision, sample_per_trip)
 
     conn.commit()
     return trips

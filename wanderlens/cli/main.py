@@ -22,6 +22,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also run vision tagging on sampled photos (sends them to the VLM)",
     )
+    p_ingest.add_argument(
+        "--retag",
+        action="store_true",
+        help="re-run vision tagging even if subjects are already stored",
+    )
     p_ingest.set_defaults(func=cmd_ingest)
 
     p_profile = sub.add_parser("profile", help="manage the taste profile")
@@ -56,7 +61,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
         vision = HostedVLM(config.api_key, config.vlm_model)
 
-    trips = run_profile(config, user_name=args.user, vision=vision)
+    trips = run_profile(config, user_name=args.user, vision=vision, retag=args.retag)
     print(
         f"Ingested {count} new photo(s); built profile with {len(trips)} trip(s) "
         f"into {config.db_path}"
