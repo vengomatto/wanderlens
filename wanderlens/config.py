@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Optional
 
@@ -17,6 +17,8 @@ class Config:
     vlm_provider: str
     vlm_model: str
     api_key: Optional[str]
+    description_providers: list[str] = field(default_factory=lambda: ["wikimedia", "llm"])
+    llm_model: str = "openai/gpt-4o-mini:online"
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -60,6 +62,16 @@ def load_config(
         env.get("ANTHROPIC_API_KEY"),
     )
 
+    providers_raw = (
+        values.get("description_providers")
+        or env.get("WANDERLENS_DESCRIPTION_PROVIDERS")
+        or ["wikimedia", "llm"]
+    )
+    if isinstance(providers_raw, str):
+        description_providers = [p.strip() for p in providers_raw.split(",") if p.strip()]
+    else:
+        description_providers = list(providers_raw)
+
     return Config(
         data_dir=data_dir,
         photos_dir=photos_dir,
@@ -70,4 +82,8 @@ def load_config(
         or env.get("WANDERLENS_VLM_MODEL")
         or "openai/gpt-4o-mini",
         api_key=api_key,
+        description_providers=description_providers,
+        llm_model=values.get("llm_model")
+        or env.get("WANDERLENS_LLM_MODEL")
+        or "openai/gpt-4o-mini:online",
     )
