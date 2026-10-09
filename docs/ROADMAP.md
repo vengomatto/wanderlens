@@ -23,10 +23,11 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
 
 ## Known limitations
 
-- **Destination descriptions are now enriched** (Wikipedia extracts / Wikidata
-  descriptions), which fixed the held-out evaluation: Malta resurfaces at rank 1.
-  Ranking quality is still coarse, though — scores cluster tightly and taste is
-  the mean of all photos. Tune the taste vector and consider attribute matching
-  over the shared vocabulary next.
+- **Ranking now uses attribute matching** over the shared vocabulary, blended
+  with embeddings (`alpha`, default 0.5). Coastal Taste Profile now ranks coastal
+  cities first; inland Rivas-Vaciamadrid fell from rank 5 to 44, Puente de
+  Vallecas from 1 to 65, and the held-out Malta evaluation still passes (rank 3).
+  Still worth tuning `alpha` and moving from one global taste mean to per-trip
+  centroids.
 - **Trip splitting** is a fixed 18h / 150km heuristic; the Malta archive split
   into 2 trips over one overnight gap. Make thresholds configurable.
