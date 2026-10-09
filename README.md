@@ -91,6 +91,10 @@ already-downloaded files):
 model. Without it, subject tags are skipped; geography and aesthetics are still
 computed locally.
 
+Visited areas are excluded from recommendations by **proximity** (default 60 km
+around each trip), not by country — so one Trentino trip does not remove all of
+Italy. Tune with `WANDERLENS_EXCLUDE_RADIUS_KM`.
+
 ## Architecture
 
 Ports and adapters. The `core/` never imports a photo manager or a model runtime:
