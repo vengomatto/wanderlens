@@ -24,9 +24,9 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
 ## Providers
 
 - Destination descriptions come from an ordered provider chain. Implemented:
-  `wikimedia` (Wikipedia/Wikidata) and `llm` (OpenRouter, search-grounded).
-  Order is configurable. Next candidates: OpenTripMap (POIs) and a curated
-  local file.
+  `wikimedia` (Wikipedia/Wikidata), `openstreetmap` (free OSM features via
+  Nominatim + Overpass, best-effort), and `llm` (OpenRouter, no search by
+  default). Order is configurable. Next candidates: a curated local file.
 - Attribute tags from the VLM are still freeform comma lists; move to structured
   extraction constrained to the shared vocabulary.
 

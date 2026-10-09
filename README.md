@@ -70,11 +70,16 @@ non-empty description wins and is cached. Wikimedia is one provider, not the onl
 one. Configure the order via env/config:
 
 - `wikimedia` (default) — Wikipedia extracts / Wikidata descriptions, free.
+- `openstreetmap` (default) — free, keyless feature words from OSM tags
+  (coastline, beach, marina, historic…), via Nominatim + Overpass. Best-effort:
+  the public Overpass servers are sometimes busy and the chain moves on.
 - `llm` (default fallback) — one sentence from a cheap hosted LLM
   (`meta-llama/llama-3.1-8b-instruct`, no search by default).
 
+Default order: `wikimedia → openstreetmap → llm`.
+
 ```bash
-WANDERLENS_DESCRIPTION_PROVIDERS=wikimedia,llm
+WANDERLENS_DESCRIPTION_PROVIDERS=wikimedia,openstreetmap,llm
 WANDERLENS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct
 ```
 
