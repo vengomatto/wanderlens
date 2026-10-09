@@ -60,18 +60,80 @@ def test_fetch_wikidata_description_parses():
     assert fetch_wikidata_description("Cartagena", session=session) == "municipality in the Region of Murcia, Spain"
 
 
+class StubProvider:
+    name = "stub"
+
+    def __init__(self, fn):
+        self.fn = fn
+        self.calls = 0
+
+    def describe(self, name, country):
+        self.calls += 1
+        return self.fn(name, country)
+
+
 def test_enrich_records_sets_description_and_tolerates_failure():
     records = [{"name": "A", "description": ""}, {"name": "B", "description": ""}]
 
-    def flaky(record):
-        if record["name"] == "B":
+    def flaky(name, country):
+        if name == "B":
             raise RuntimeError("network")
         return "coastal town"
 
-    enrich_records(records, fetch=flaky)
+    enrich_records(records, providers=[StubProvider(flaky)])
 
     assert records[0]["description"] == "coastal town"
     assert records[1]["description"] == ""
+
+
+def test_provider_chain_first_nonempty_wins():
+    first = StubProvider(lambda name, country: "")
+    second = StubProvider(lambda name, country: "from second")
+    third = StubProvider(lambda name, country: "from third")
+
+    records = [{"name": "X", "description": ""}]
+    enrich_records(records, providers=[first, second, third])
+
+    assert records[0]["description"] == "from second"
+    assert first.calls == 1 and second.calls == 1 and third.calls == 0
+
+
+def test_provider_chain_falls_back_on_exception():
+    def boom(name, country):
+        raise RuntimeError("down")
+
+    records = [{"name": "X", "description": ""}]
+    enrich_records(records, providers=[StubProvider(boom), StubProvider(lambda n, c: "ok")])
+
+    assert records[0]["description"] == "ok"
+
+
+def test_llm_provider_parses_and_handles_miss():
+    from wanderlens.catalog.providers import LlmProvider
+
+    class Model:
+        def __init__(self, text): self.text = text
+        def complete(self, prompt): return self.text
+
+    assert LlmProvider(Model("a coastal town.")).describe("X", "Y") == "a coastal town."
+    assert LlmProvider(Model("   ")).describe("X", "Y") is None
+
+    class Broken:
+        def complete(self, prompt): raise RuntimeError("no key")
+
+    assert LlmProvider(Broken()).describe("X", "Y") is None
+
+
+def test_build_provider_chain_respects_order():
+    from wanderlens.catalog.providers import build_provider_chain
+    from wanderlens.config import Config
+
+    config = Config(
+        data_dir=Path("."), photos_dir=Path("."), db_path=Path("."), catalog_path=Path("."),
+        vlm_provider="t", vlm_model="t", api_key="k", description_providers=["llm", "wikimedia"],
+    )
+    chain = build_provider_chain(config)
+    assert [p.name for p in chain] == ["llm", "wikimedia"]
 
 
 def _config(tmp_path):
@@ -92,19 +154,15 @@ def _config(tmp_path):
 
 def test_default_catalog_enriches_then_caches(tmp_path):
     config = _config(tmp_path)
-    calls = []
+    provider = StubProvider(lambda name, country: f"coastal town near {name}")
 
-    def stub(record):
-        calls.append(record["name"])
-        return f"coastal town near {record['name']}"
-
-    first = default_catalog(config, description_fetcher=stub)
+    first = default_catalog(config, providers=[provider])
     assert {d.name for d in first.candidates()} == {"Genoa", "Rome"}
     assert all(d.description for d in first.candidates())
-    assert len(calls) == 2
+    assert provider.calls == 2
 
-    second = default_catalog(config, description_fetcher=stub)
-    assert len(calls) == 2, "cache should prevent refetching"
+    second = default_catalog(config, providers=[provider])
+    assert provider.calls == 2, "cache should prevent refetching"
     assert {d.name for d in second.candidates()} == {"Genoa", "Rome"}
 
 
@@ -120,7 +178,7 @@ def test_eval_catalog_includes_holdout_country(tmp_path):
     config = _config(tmp_path)
     from wanderlens.pipeline.evaluate import _eval_catalog
 
-    catalog = _eval_catalog(config, "Malta", description_fetcher=lambda record: "desc")
+    catalog = _eval_catalog(config, "Malta", providers=[StubProvider(lambda n, c: "desc")])
 
     countries = {d.country for d in catalog.candidates()}
     assert "Malta" in countries, "hold-out country must be present as candidates"
