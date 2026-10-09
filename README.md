@@ -15,6 +15,43 @@ app later.
    using your own photos.
 4. **Evaluate** by holding out a visited place and checking whether it resurfaces.
 
+## How it works
+
+```mermaid
+flowchart TD
+    A[Photo folder] -->|FolderSource: EXIF time / GPS| B[(Photos · SQLite)]
+
+    B --> C[Trip clustering<br/>time + GPS]
+    C --> D[Reverse geocode<br/>GeoNames · offline] --> TP[Taste Profile]
+    B --> E[CLIP embeddings<br/>local ONNX · per photo] --> TP
+    B --> F[Sample ~3 per trip] --> G[Vision model<br/>OpenRouter] --> TP
+    TP --> TPDB[(Taste Profile · SQLite)]
+
+    H[GeoNames cities<br/>~236k · offline] --> I[Candidate Destinations]
+    I --> J{Description providers<br/>first non-empty wins}
+    J --> K[(Enriched Destinations<br/>cached JSON)]
+
+    TPDB --> R[Ranking<br/>alpha * embedding + (1-alpha) * attributes]
+    K --> R
+    D -. visited places (excluded) .-> R
+    R --> REC[Recommendations · CLI]
+    REC --> EV[Eval: hold out a visited place<br/>does it resurface?]
+```
+
+**Description providers** — each candidate Destination is described by the first
+provider that returns something, then cached:
+
+```mermaid
+flowchart LR
+    D[Destination<br/>name + country] --> W[wikimedia<br/>Wikipedia / Wikidata<br/>free]
+    W -->|miss| O[openstreetmap<br/>Nominatim + Overpass<br/>free, keyless]
+    O -->|miss| L[llm<br/>OpenRouter<br/>cheap, no search]
+    W -->|hit| OUT[Description]
+    O -->|hit| OUT
+    L -->|hit| OUT
+    OUT --> C[(cache)]
+```
+
 ## Install
 
 ```bash
@@ -103,6 +140,6 @@ bash scripts/smoke.sh   # end-to-end over data/photos
 
 - v1 is single-user; every persisted row carries a `user` id for the future
   multi-user/open-source app.
-- Destination text comes from GeoNames names only, which is a weak matching
-  signal — enrich with Wikidata descriptions before trusting ranking quality.
-  See `docs/ROADMAP.md` and `openspec/changes/wanderlens-v1/`.
+- Destination descriptions come from a provider chain (Wikimedia / OpenStreetMap
+  / cheap LLM); ranking blends embeddings with canonical-attribute matching.
+  Ranking is plausible but coarse — see `docs/ROADMAP.md`.
