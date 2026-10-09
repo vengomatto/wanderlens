@@ -18,6 +18,10 @@ exclude places the user has already visited.
 - **WHEN** a candidate Destination matches the Taste Profile and has not been visited
 - **THEN** it is eligible to be returned as a Recommendation
 
+#### Scenario: Best-matching facet scores a destination
+- **WHEN** a candidate Destination matches any one of the taste facets strongly
+- **THEN** it scores on that best-matching facet rather than on an averaged taste
+
 ### Requirement: Explain each recommendation
 The system SHALL provide a human-readable explanation for each Recommendation,
 grounded in the user's own Photos.
