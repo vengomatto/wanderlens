@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS trips (
     end_at      TEXT,
     country     TEXT,
     city        TEXT,
+    lat         REAL,
+    lon         REAL,
     PRIMARY KEY (user_id, id)
 );
 
@@ -54,6 +56,13 @@ CREATE TABLE IF NOT EXISTS trip_photos (
     trip_id     INTEGER NOT NULL,
     photo_id    TEXT    NOT NULL,
     PRIMARY KEY (user_id, trip_id, photo_id)
+);
+
+CREATE TABLE IF NOT EXISTS trip_subjects (
+    user_id     INTEGER NOT NULL,
+    trip_id     INTEGER NOT NULL,
+    subject     TEXT    NOT NULL,
+    PRIMARY KEY (user_id, trip_id, subject)
 );
 
 CREATE TABLE IF NOT EXISTS profile_entries (
@@ -87,4 +96,13 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    _migrate(conn)
     conn.commit()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(trips)")}
+    if "lat" not in columns:
+        conn.execute("ALTER TABLE trips ADD COLUMN lat REAL")
+    if "lon" not in columns:
+        conn.execute("ALTER TABLE trips ADD COLUMN lon REAL")

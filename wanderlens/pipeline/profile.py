@@ -57,8 +57,12 @@ def _persist_trips(conn: sqlite3.Connection, user_id: int, trips: list[Trip]) ->
     conn.execute("DELETE FROM trip_photos WHERE user_id = ?", (user_id,))
     for trip in trips:
         times = [p.taken_at for p in trip.photos if p.taken_at]
+        located = [p for p in trip.photos if p.lat is not None and p.lon is not None]
+        lat = sum(p.lat for p in located) / len(located) if located else None
+        lon = sum(p.lon for p in located) / len(located) if located else None
         conn.execute(
-            "INSERT INTO trips (user_id, id, start_at, end_at, country, city) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO trips (user_id, id, start_at, end_at, country, city, lat, lon) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 trip.id,
@@ -66,6 +70,8 @@ def _persist_trips(conn: sqlite3.Connection, user_id: int, trips: list[Trip]) ->
                 max(times).isoformat() if times else None,
                 trip.country,
                 trip.city,
+                lat,
+                lon,
             ),
         )
         for photo in trip.photos:
@@ -103,20 +109,42 @@ def _embed_photos(conn: sqlite3.Connection, user_id: int, photos: list[Photo], e
 def _store_subjects(
     conn: sqlite3.Connection, user_id: int, trips: list[Trip], vision, sample_per_trip: int
 ) -> None:
-    counts: dict[str, float] = {}
+    from collections import Counter
+
+    from wanderlens.core.vocabulary import canonicalize
+
+    conn.execute("DELETE FROM trip_subjects WHERE user_id = ?", (user_id,))
+    conn.execute(
+        "DELETE FROM profile_entries WHERE user_id = ? AND factor = 'subjects'", (user_id,)
+    )
+
+    per_trip: dict[int, set[str]] = {}
     for trip in trips:
         sample = sample_trip_photos(trip.photos, sample_per_trip)
         try:
             tags = vision.describe([p.path for p in sample])
         except Exception:
             tags = []
+        attributes: set[str] = set()
         for tag in tags:
-            counts[tag] = counts.get(tag, 0.0) + 1.0
-    total = sum(counts.values())
-    for tag, count in counts.items():
+            attributes.update(canonicalize(tag))
+        per_trip[trip.id] = attributes
+        for attribute in sorted(attributes):
+            conn.execute(
+                "INSERT OR IGNORE INTO trip_subjects (user_id, trip_id, subject) VALUES (?, ?, ?)",
+                (user_id, trip.id, attribute),
+            )
+
+    total_trips = len(trips) or 1
+    recurrence: Counter = Counter()
+    for attributes in per_trip.values():
+        for attribute in attributes:
+            recurrence[attribute] += 1
+    for attribute, count in recurrence.items():
         conn.execute(
-            "INSERT OR REPLACE INTO profile_entries (user_id, factor, key, value) VALUES (?, 'subjects', ?, ?)",
-            (user_id, tag, count / total if total else 0.0),
+            "INSERT OR REPLACE INTO profile_entries (user_id, factor, key, value) "
+            "VALUES (?, 'subjects', ?, ?)",
+            (user_id, attribute, count / total_trips),
         )
 
 
