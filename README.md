@@ -70,16 +70,22 @@ non-empty description wins and is cached. Wikimedia is one provider, not the onl
 one. Configure the order via env/config:
 
 - `wikimedia` (default) — Wikipedia extracts / Wikidata descriptions, free.
-- `llm` (default fallback) — one sentence from a hosted LLM, search-grounded by
-  default (`openai/gpt-4o-mini:online`).
+- `llm` (default fallback) — one sentence from a cheap hosted LLM
+  (`meta-llama/llama-3.1-8b-instruct`, no search by default).
 
 ```bash
 WANDERLENS_DESCRIPTION_PROVIDERS=wikimedia,llm
-WANDERLENS_LLM_MODEL=openai/gpt-4o-mini:online
+WANDERLENS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct
 ```
 
 Only place names are sent to the LLM — never photos. Results are cached in
 `data/catalog/destinations*.json`, so each place is described at most once.
+
+**Do not add `:online` by default.** Search grounding is billed per request
+(≈ $0.007 via Exa) and costs far more than the tokens. Wikimedia already covers
+notable places; if you need search for obscure ones, opt in and prefer a cheap
+engine, e.g. `WANDERLENS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct:online` with
+Parallel turbo (`$0.001`/request).
 
 ## Testing
 
