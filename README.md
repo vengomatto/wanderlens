@@ -31,9 +31,9 @@ flowchart TD
     I --> J{Description providers<br/>first non-empty wins}
     J --> K[(Enriched Destinations<br/>cached JSON)]
 
-    TPDB --> R[Ranking<br/>alpha * embedding + (1-alpha) * attributes]
+    TPDB --> R["Ranking<br/>alpha * embedding + (1-alpha) * attributes"]
     K --> R
-    D -. visited places (excluded) .-> R
+    D -. "visited places (excluded)" .-> R
     R --> REC[Recommendations · CLI]
     REC --> EV[Eval: hold out a visited place<br/>does it resurface?]
 ```
