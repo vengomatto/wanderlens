@@ -61,7 +61,7 @@ def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> Tast
 
 
 def default_catalog(
-    config, limit: int = 150, enrich: bool = True, description_fetcher=None
+    config, limit: int = 150, enrich: bool = True, providers=None
 ) -> JsonCatalog:
     cache = config.catalog_path / "destinations.json"
     if cache.exists():
@@ -78,7 +78,11 @@ def default_catalog(
         countries_path=countries if countries.exists() else None,
     )
     if enrich:
-        enrich_records(records, fetch=description_fetcher)
+        if providers is None:
+            from wanderlens.catalog.providers import build_provider_chain
+
+            providers = build_provider_chain(config)
+        enrich_records(records, providers=providers)
     catalog = build_catalog({"geonames": records})
     catalog.save(cache)
     return catalog

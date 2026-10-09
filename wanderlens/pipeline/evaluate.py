@@ -22,7 +22,7 @@ from wanderlens.pipeline.recommend import (
 EVAL_MIN_POPULATION = 10000
 
 
-def _eval_catalog(config, holdout: str, description_fetcher=None) -> JsonCatalog:
+def _eval_catalog(config, holdout: str, providers=None) -> JsonCatalog:
     cache = config.catalog_path / f"destinations_eval_{holdout.lower()}.json"
     if cache.exists():
         return JsonCatalog.load(cache)
@@ -47,10 +47,13 @@ def _eval_catalog(config, holdout: str, description_fetcher=None) -> JsonCatalog
         min_population=EVAL_MIN_POPULATION,
         countries_path=countries_path,
     )
-    enrich_records(records, fetch=description_fetcher)
+    if providers is None:
+        from wanderlens.catalog.providers import build_provider_chain
+
+        providers = build_provider_chain(config)
+    enrich_records(records, providers=providers)
     catalog = build_catalog({"geonames": records})
-    if description_fetcher is None:
-        catalog.save(cache)
+    catalog.save(cache)
     return catalog
 
 
@@ -61,7 +64,7 @@ def run_eval(
     within_top: int = 50,
     embedder=None,
     catalog: Optional[JsonCatalog] = None,
-    description_fetcher=None,
+    providers=None,
 ) -> str:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -93,7 +96,7 @@ def run_eval(
 
         embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
 
-    catalog = catalog or _eval_catalog(config, holdout, description_fetcher=description_fetcher)
+    catalog = catalog or _eval_catalog(config, holdout, providers=providers)
     candidates = catalog.candidates()
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     profile = load_profile(conn, user_id, embedding=taste)

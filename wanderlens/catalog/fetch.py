@@ -67,33 +67,30 @@ def fetch_wikidata_description(name: str, session=None, timeout: int = 30) -> st
     return results[0].get("description", "") if results else ""
 
 
-def default_description(record: dict) -> str:
-    name = record.get("name", "")
-    country = record.get("countryName", "")
-    try:
-        summary = fetch_wikipedia_summary(name, country)
-        if summary:
-            return summary
-    except Exception:
-        pass
-    try:
-        return fetch_wikidata_description(name)
-    except Exception:
-        return ""
+def enrich_records(records: list[dict], providers=None, delay: float = 0.0) -> list[dict]:
+    """Attach a description to each record via a provider chain; never fail the batch.
 
-
-def enrich_records(records: list[dict], fetch=None, delay: float = 0.0) -> list[dict]:
-    """Attach a description to each record that lacks one; never fail the batch."""
+    Providers are tried in order; the first non-empty description wins.
+    """
     import time
 
-    fetch = fetch or default_description
+    from wanderlens.catalog.providers import WikimediaProvider
+
+    if providers is None:
+        providers = [WikimediaProvider()]
+
     for record in records:
         if record.get("description"):
             continue
-        try:
-            record["description"] = fetch(record) or ""
-        except Exception:
-            record["description"] = ""
+        description = ""
+        for provider in providers:
+            try:
+                description = provider.describe(record.get("name", ""), record.get("countryName", "")) or ""
+            except Exception:
+                description = ""
+            if description:
+                break
+        record["description"] = description
         if delay:
             time.sleep(delay)
     return records
