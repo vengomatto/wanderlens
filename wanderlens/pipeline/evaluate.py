@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from wanderlens.catalog.destinations import JsonCatalog
-from wanderlens.catalog.fetch import build_catalog, load_geonames_cities
+from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
 from wanderlens.core.evaluate import evaluate_holdout
 from wanderlens.core.recommend import rank_destinations
 from wanderlens.db import connect, init_db
@@ -15,7 +15,7 @@ from wanderlens.pipeline.recommend import (
 EVAL_MIN_POPULATION = 10000
 
 
-def _eval_catalog(config, holdout: str) -> JsonCatalog:
+def _eval_catalog(config, holdout: str, description_fetcher=None) -> JsonCatalog:
     countries = list(dict.fromkeys(DEFAULT_CANDIDATE_COUNTRIES + [holdout]))
     cities = config.catalog_path / "cities500.txt"
     if not cities.exists():
@@ -36,6 +36,7 @@ def _eval_catalog(config, holdout: str) -> JsonCatalog:
         min_population=EVAL_MIN_POPULATION,
         countries_path=countries_path,
     )
+    enrich_records(records, fetch=description_fetcher)
     return build_catalog({"geonames": records})
 
 
@@ -46,6 +47,7 @@ def run_eval(
     within_top: int = 50,
     embedder=None,
     catalog: Optional[JsonCatalog] = None,
+    description_fetcher=None,
 ) -> str:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -77,7 +79,7 @@ def run_eval(
 
         embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
 
-    catalog = catalog or _eval_catalog(config, holdout)
+    catalog = catalog or _eval_catalog(config, holdout, description_fetcher=description_fetcher)
     ranked = rank_destinations(
         taste,
         catalog.candidates(),

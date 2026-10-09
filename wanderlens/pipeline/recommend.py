@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 
 from wanderlens.catalog.destinations import JsonCatalog
-from wanderlens.catalog.fetch import build_catalog, load_geonames_cities
+from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
 from wanderlens.core.models import Recommendation, TasteProfile
 from wanderlens.core.recommend import explain, rank_destinations, taste_embedding
 from wanderlens.db import connect, init_db
@@ -31,7 +31,9 @@ def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> Tast
     return TasteProfile(user_id=user_id, geography=geography, tags=tags, embedding=embedding)
 
 
-def default_catalog(config, limit: int = 150) -> JsonCatalog:
+def default_catalog(
+    config, limit: int = 150, enrich: bool = True, description_fetcher=None
+) -> JsonCatalog:
     cache = config.catalog_path / "destinations.json"
     if cache.exists():
         return JsonCatalog.load(cache)
@@ -46,6 +48,8 @@ def default_catalog(config, limit: int = 150) -> JsonCatalog:
         limit=limit,
         countries_path=countries if countries.exists() else None,
     )
+    if enrich:
+        enrich_records(records, fetch=description_fetcher)
     catalog = build_catalog({"geonames": records})
     catalog.save(cache)
     return catalog
