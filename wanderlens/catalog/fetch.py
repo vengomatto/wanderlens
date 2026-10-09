@@ -7,6 +7,96 @@ from typing import Iterable, Optional
 from wanderlens.catalog.destinations import JsonCatalog, normalize_record
 
 WIKIDATA_ENDPOINT = "https://query.wikidata.org/sparql"
+WIKIDATA_API = "https://www.wikidata.org/w/api.php"
+WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
+USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
+
+
+def fetch_wikipedia_summary(
+    name: str, country: str = "", session=None, timeout: int = 30
+) -> str:
+    """First-sentence Wikipedia intro for a place, via country-qualified search."""
+    import requests
+
+    session = session or requests
+    response = session.get(
+        WIKIPEDIA_API,
+        params={
+            "action": "query",
+            "format": "json",
+            "generator": "search",
+            "gsrsearch": f"{name} {country}".strip(),
+            "gsrlimit": 1,
+            "prop": "extracts",
+            "exintro": 1,
+            "explaintext": 1,
+            "redirects": 1,
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    pages = response.json().get("query", {}).get("pages", {})
+    if not pages:
+        return ""
+    page = next(iter(pages.values()))
+    extract = " ".join(page.get("extract", "").split())
+    return extract[:300]
+
+
+def fetch_wikidata_description(name: str, session=None, timeout: int = 30) -> str:
+    """Concise Wikidata description for a place."""
+    import requests
+
+    session = session or requests
+    response = session.get(
+        WIKIDATA_API,
+        params={
+            "action": "wbsearchentities",
+            "search": name,
+            "language": "en",
+            "format": "json",
+            "limit": 1,
+            "type": "item",
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    results = response.json().get("search", [])
+    return results[0].get("description", "") if results else ""
+
+
+def default_description(record: dict) -> str:
+    name = record.get("name", "")
+    country = record.get("countryName", "")
+    try:
+        summary = fetch_wikipedia_summary(name, country)
+        if summary:
+            return summary
+    except Exception:
+        pass
+    try:
+        return fetch_wikidata_description(name)
+    except Exception:
+        return ""
+
+
+def enrich_records(records: list[dict], fetch=None, delay: float = 0.0) -> list[dict]:
+    """Attach a description to each record that lacks one; never fail the batch."""
+    import time
+
+    fetch = fetch or default_description
+    for record in records:
+        if record.get("description"):
+            continue
+        try:
+            record["description"] = fetch(record) or ""
+        except Exception:
+            record["description"] = ""
+        if delay:
+            time.sleep(delay)
+    return records
 
 
 def load_geonames_cities(
