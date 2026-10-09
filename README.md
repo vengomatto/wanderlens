@@ -140,6 +140,18 @@ notable places; if you need search for obscure ones, opt in and prefer a cheap
 engine, e.g. `WANDERLENS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct:online` with
 Parallel turbo (`$0.001`/request).
 
+## Destination catalog
+
+Recommendation candidates come from a **travel** catalog at **area granularity** —
+Wikivoyage (Regions / Cities / Other destinations) — so suggestions are places
+like *Costa del Sol* or *Cinque Terre*, not individual municipalities. Each
+Destination records its `granularity`. GeoNames is retained **only** for offline
+reverse-geocoding of visited trips.
+
+```bash
+WANDERLENS_CATALOG_SOURCE=wikivoyage   # default; or "geonames"
+```
+
 ## Testing
 
 ```bash

@@ -11,18 +11,36 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
   feed that back into the Taste Profile. Needs a feedback surface; strong signal
   once the core loop works.
 
-## v2 — Destination granularity (areas, not municipalities)
+## Destination granularity (areas, not municipalities)
 
-- Today the recommendation catalog is GeoNames **municipalities**, so it suggests
-  small towns (e.g. *Torrevieja*) as if they were self-contained destinations like
-  *New York*. A municipality is often just a stop within a region.
-- **Destination** should mean a **self-contained travel area** — *Costa del Sol*,
-  *Cinque Terre*, *Amalfi Coast* — not an administrative point.
-- Plan: source recommendation candidates from a **travel catalog at region
-  granularity**, chiefly **Wikivoyage** (regions + "Other destinations", free,
-  travel-oriented). Keep GeoNames for reverse-geocoding *visited* places.
-- Follow-ups: a `Destination` `granularity`/`parent` field; map small municipalities
-  to their containing area; exclude at area level.
+- **Done:** the recommendation catalog is now built from **Wikivoyage** at area
+  granularity (Regions / Cities / Other destinations), e.g. *Epirus*,
+  *Algarve*, *Cinque Terre*. GeoNames is retained only for offline
+  reverse-geocoding of visited trips (`WANDERLENS_CATALOG_SOURCE`).
+- **Remaining:** use the `granularity` tag to filter/boost (favour areas over
+  small towns); clean section-link noise (e.g. a page linked under the wrong
+  country, "Bosnia and Herzegovina (Croatia)"); and add the
+  **famous vs uncommon** signal.
+
+## Strategy — where the value is (catalog vs profiling)
+
+- **The catalog is not the moat.** Wikipedia/Wikivoyage/Wikidata are public and
+  ground the app; anyone can query them. The defensible value is the **taste
+  profile** (from the user's private photos), the **matching**, and the
+  **famous↔uncommon mix calibrated per user**.
+- **Recommend both famous and uncommon places.** Famous = high confidence, low
+  discovery. Uncommon = the reason to use the app over a search engine.
+- **Uncommon needs a broader catalog + a popularity signal.**
+  - Broaden with **open data / APIs**, not scraping: OpenStreetMap/Overture
+    (everything, tagged), OpenTripMap, Foursquare free tier, Wikidata.
+  - Add a **popularity/novelty signal** (e.g. Wikimedia Pageviews; OSM tag
+    richness) so `uncommon = low popularity ∧ high taste-match` is measurable.
+  - Scraping (Google/TripAdvisor/blogs) is a **last resort**: ToS-grey and
+    fragile. Only where open data genuinely lacks coverage.
+- **Smart layer for discovery, deterministic layer for truth.** The LLM
+  *hypothesizes* uncommon candidates; OSM/Wikidata *validate* existence,
+  coordinates, and features. Balance famous vs uncommon from the user's
+  **novelty-vs-familiarity** preference.
 
 ## v2 — Smart (non-deterministic) layer
 
