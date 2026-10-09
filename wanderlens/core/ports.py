@@ -33,3 +33,13 @@ class VisionModel(Protocol):
 class PlaceCatalog(Protocol):
     def candidates(self, area: str | None = None) -> Iterable[Destination]:
         ...
+
+
+class DescriptionProvider(Protocol):
+    """Supplies a short description for a place. Must return ``None`` on a miss
+    (never raise) so a provider chain can continue."""
+
+    name: str
+
+    def describe(self, name: str, country: str) -> "str | None":
+        ...
