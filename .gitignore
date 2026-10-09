@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+
+# Wanderlens data (photos, sqlite, caches) — never commit
+data/
+
+# OS
+.DS_Store
