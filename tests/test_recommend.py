@@ -5,7 +5,11 @@ import numpy as np
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.config import Config
 from wanderlens.core.models import Destination
-from wanderlens.core.recommend import rank_destinations, taste_embedding
+from wanderlens.core.recommend import (
+    rank_destinations,
+    taste_attribute_weights,
+    taste_embedding,
+)
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.recommend import run_recommend
 
@@ -85,6 +89,32 @@ def test_rank_is_repeatable():
 def test_taste_embedding_normalized():
     vector = taste_embedding([np.array([1.0, 1.0], dtype=np.float32)])
     assert abs(float(np.linalg.norm(vector)) - 1.0) < 1e-6
+
+
+def test_taste_attribute_weights_canonicalizes_and_normalizes():
+    weights = taste_attribute_weights({"turquoise water": 0.5, "coastal city": 0.5})
+    assert {"water", "coastal", "city"} <= set(weights)
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+
+
+def test_attribute_match_overrides_equal_embeddings():
+    def embed_text(text):
+        return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    taste = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    coastal = Destination(
+        id="c", name="Seaside", lat=1, lon=1, country="Greece", description="a coastal seaside town"
+    )
+    inland = Destination(
+        id="i", name="Inland", lat=1, lon=1, country="Spain", description="an inland city in the mountains"
+    )
+    tags = taste_attribute_weights({"coastal": 1.0})
+
+    ranked = rank_destinations(taste, [inland, coastal], embed_text, taste_tags=tags, alpha=0.5)
+
+    assert ranked[0].destination.name == "Seaside"
+    assert ranked[0].attribute_score > ranked[1].attribute_score
+    assert ranked[0].embedding_score is not None
 
 
 def _config(tmp_path):
