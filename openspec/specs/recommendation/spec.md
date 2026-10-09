@@ -22,6 +22,15 @@ exclude places the user has already visited.
 - **WHEN** a candidate Destination matches any one of the taste facets strongly
 - **THEN** it scores on that best-matching facet rather than on an averaged taste
 
+#### Scenario: Exclusion is local, not by country
+- **WHEN** a candidate Destination is far from every visited trip but in the same
+  country as one
+- **THEN** it is still eligible to be recommended
+
+#### Scenario: Nearby place excluded
+- **WHEN** a candidate Destination lies within the exclusion radius of a visited trip
+- **THEN** it is not returned as a Recommendation
+
 ### Requirement: Explain each recommendation
 The system SHALL provide a human-readable explanation for each Recommendation,
 grounded in the user's own Photos.
