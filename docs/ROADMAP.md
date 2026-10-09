@@ -11,6 +11,35 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
   feed that back into the Taste Profile. Needs a feedback surface; strong signal
   once the core loop works.
 
+## v2 — Destination granularity (areas, not municipalities)
+
+- Today the recommendation catalog is GeoNames **municipalities**, so it suggests
+  small towns (e.g. *Torrevieja*) as if they were self-contained destinations like
+  *New York*. A municipality is often just a stop within a region.
+- **Destination** should mean a **self-contained travel area** — *Costa del Sol*,
+  *Cinque Terre*, *Amalfi Coast* — not an administrative point.
+- Plan: source recommendation candidates from a **travel catalog at region
+  granularity**, chiefly **Wikivoyage** (regions + "Other destinations", free,
+  travel-oriented). Keep GeoNames for reverse-geocoding *visited* places.
+- Follow-ups: a `Destination` `granularity`/`parent` field; map small municipalities
+  to their containing area; exclude at area level.
+
+## v2 — Smart (non-deterministic) layer
+
+- At some point the deterministic core (embeddings + vocabulary attributes) is
+  not enough; we want a *bit* of smart, non-deterministic AI in **attribution**
+  and/or **recommendations**.
+- **Attribution:** LLM extraction with a schema constrained to the shared
+  vocabulary, reasoning over a *trip's* photos together (vibe + attributes),
+  instead of per-photo comma tags.
+- **Recommendations:** the existing `HostedRanker` seam — LLM does last-mile
+  ranking/synthesis and the "why", including novelty-vs-familiarity and
+  "self-contained destination" judgement.
+- **Guardrails:** deterministic core remains the default and fallback; the smart
+  layer is optional/injectable; outputs constrained (JSON schema + vocabulary);
+  model+prompt pinned and cached for reproducibility; hard filters (eligibility,
+  exclusion) stay deterministic; quality measured with the hold-out.
+
 ## v2 — Interface
 
 - **Web app** — layered on the same core as the CLI.

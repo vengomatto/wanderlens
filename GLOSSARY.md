@@ -26,8 +26,10 @@ across the Preference Factors.
 _Avoid_: user model, persona, preference set
 
 **Destination**:
-A place the app can recommend. Distinct from a place the user has visited.
-_Avoid_: location, spot, POI
+A **self-contained travel area** the app can recommend (a region or coherent
+area such as *Costa del Sol* or *Cinque Terre*), not a single municipality or a
+stop within a region. Distinct from a place the user has visited.
+_Avoid_: location, spot, POI, town, city
 
 **Recommendation**:
 A Destination proposed to the user, ranked against the Taste Profile and
