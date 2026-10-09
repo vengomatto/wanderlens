@@ -11,6 +11,7 @@ from wanderlens.core.models import Recommendation, TasteProfile
 from wanderlens.core.recommend import (
     destination_text,
     explain,
+    filter_unvisited_proximity,
     rank_destinations,
     taste_attribute_weights,
     taste_embedding,
@@ -26,6 +27,35 @@ def load_taste_embedding(conn: sqlite3.Connection, user_id: int) -> Optional[np.
     ).fetchall()
     vectors = [np.frombuffer(row["vector"], dtype=np.float32) for row in rows]
     return taste_embedding(vectors)
+
+
+def load_taste_facets(
+    conn: sqlite3.Connection, user_id: int, exclude_trip_id: Optional[int] = None
+) -> list[np.ndarray]:
+    """One normalized embedding centroid per trip (the taste facets)."""
+    rows = conn.execute(
+        """
+        SELECT tp.trip_id AS trip_id, pe.vector AS vector
+        FROM trip_photos tp
+        JOIN photo_embeddings pe
+          ON pe.user_id = tp.user_id AND pe.photo_id = tp.photo_id
+        WHERE tp.user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+    groups: dict[int, list[np.ndarray]] = {}
+    for row in rows:
+        if exclude_trip_id is not None and row["trip_id"] == exclude_trip_id:
+            continue
+        groups.setdefault(row["trip_id"], []).append(
+            np.frombuffer(row["vector"], dtype=np.float32)
+        )
+    facets: list[np.ndarray] = []
+    for vectors in groups.values():
+        mean = np.mean(np.stack(vectors), axis=0).astype(np.float32)
+        norm = np.linalg.norm(mean)
+        facets.append(mean / norm if norm else mean)
+    return facets
 
 
 def ensure_destination_embeddings(conn, destinations, embedder, model=None):
@@ -49,6 +79,14 @@ def ensure_destination_embeddings(conn, destinations, embedder, model=None):
         )
     conn.commit()
     return cached
+
+
+def load_trip_centers(conn: sqlite3.Connection, user_id: int) -> list[tuple[float, float]]:
+    rows = conn.execute(
+        "SELECT lat, lon FROM trips WHERE user_id = ? AND lat IS NOT NULL AND lon IS NOT NULL",
+        (user_id,),
+    ).fetchall()
+    return [(row["lat"], row["lon"]) for row in rows]
 
 
 def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> TasteProfile:
@@ -104,7 +142,8 @@ def run_recommend(
     user_id = get_or_create_user(conn, user_name)
 
     taste = load_taste_embedding(conn, user_id)
-    if taste is None:
+    facets = load_taste_facets(conn, user_id)
+    if not facets and taste is None:
         return []
 
     if embedder is None:
@@ -121,25 +160,28 @@ def run_recommend(
     }
 
     candidates = catalog.candidates()
-    vectors = ensure_destination_embeddings(conn, candidates, embedder)
-    candidates = catalog.candidates()
+    centers = load_trip_centers(conn, user_id)
+    radius = getattr(config, "exclude_radius_km", 60.0)
+    candidates = filter_unvisited_proximity(candidates, centers, radius)
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     profile = load_profile(conn, user_id, embedding=taste)
     recommendations = rank_destinations(
         taste,
         candidates,
         embedder.embed_text,
-        exclude_countries=visited,
         top_k=count,
         vectors=vectors,
         taste_tags=taste_attribute_weights(profile.tags),
         alpha=alpha,
+        taste_facets=facets,
     )
 
     if ranker is not None:
         recommendations = ranker.rank(recommendations, profile)
     else:
-        visited_country = next(iter(visited), None)
+        visited_country = (
+            max(profile.geography, key=profile.geography.get) if profile.geography else None
+        )
         for rec in recommendations:
             rec.explanation = explain(rec.destination, profile, visited_country)
 
