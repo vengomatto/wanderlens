@@ -8,7 +8,7 @@ import numpy as np
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
 from wanderlens.core.models import Recommendation, TasteProfile
-from wanderlens.core.recommend import explain, rank_destinations, taste_embedding
+from wanderlens.core.recommend import destination_text, explain, rank_destinations, taste_embedding
 from wanderlens.db import connect, init_db
 
 DEFAULT_CANDIDATE_COUNTRIES = ["GR", "HR", "ES", "PT", "CY", "IT", "FR", "TR", "ME", "AL"]
@@ -20,6 +20,29 @@ def load_taste_embedding(conn: sqlite3.Connection, user_id: int) -> Optional[np.
     ).fetchall()
     vectors = [np.frombuffer(row["vector"], dtype=np.float32) for row in rows]
     return taste_embedding(vectors)
+
+
+def ensure_destination_embeddings(conn, destinations, embedder, model=None):
+    """Return {destination_id: vector}, computing and caching missing ones."""
+    model = model or getattr(embedder, "name", "default")
+    cached = {
+        row["destination_id"]: np.frombuffer(row["vector"], dtype=np.float32)
+        for row in conn.execute(
+            "SELECT destination_id, vector FROM destination_embeddings WHERE model = ?", (model,)
+        )
+    }
+    for destination in destinations:
+        if destination.id in cached:
+            continue
+        vector = embedder.embed_text(destination_text(destination))
+        cached[destination.id] = vector
+        conn.execute(
+            "INSERT OR REPLACE INTO destination_embeddings (destination_id, model, dim, vector) "
+            "VALUES (?, ?, ?, ?)",
+            (destination.id, model, int(vector.shape[0]), vector.astype("float32").tobytes()),
+        )
+    conn.commit()
+    return cached
 
 
 def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> TasteProfile:
@@ -86,12 +109,17 @@ def run_recommend(
         )
     }
 
+    candidates = catalog.candidates()
+    vectors = ensure_destination_embeddings(conn, candidates, embedder)
+    candidates = catalog.candidates()
+    vectors = ensure_destination_embeddings(conn, candidates, embedder)
     recommendations = rank_destinations(
         taste,
-        catalog.candidates(),
+        candidates,
         embedder.embed_text,
         exclude_countries=visited,
         top_k=count,
+        vectors=vectors,
     )
 
     profile = load_profile(conn, user_id, embedding=taste)

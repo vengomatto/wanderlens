@@ -14,6 +14,7 @@ from wanderlens.core.recommend import rank_destinations
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.recommend import (
     DEFAULT_CANDIDATE_COUNTRIES,
+    ensure_destination_embeddings,
     load_taste_embedding,
 )
 
@@ -92,12 +93,15 @@ def run_eval(
         embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
 
     catalog = catalog or _eval_catalog(config, holdout, description_fetcher=description_fetcher)
+    candidates = catalog.candidates()
+    vectors = ensure_destination_embeddings(conn, candidates, embedder)
     ranked = rank_destinations(
         taste,
-        catalog.candidates(),
+        candidates,
         embedder.embed_text,
         exclude_countries=remaining,
         top_k=None,
+        vectors=vectors,
     )
     result = evaluate_holdout(ranked, holdout, within_top)
     return result.describe()
