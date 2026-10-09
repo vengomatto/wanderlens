@@ -46,6 +46,18 @@ class FakeSession:
         return _Response(self.data)
 
 
+class OsmSession:
+    def __init__(self, geocode, overpass):
+        self.geocode = geocode
+        self.overpass = overpass
+
+    def get(self, url, **kwargs):
+        return _Response(self.geocode)
+
+    def post(self, url, **kwargs):
+        return _Response(self.overpass)
+
+
 def test_fetch_wikipedia_summary_parses():
     session = FakeSession(
         {"query": {"pages": {"1": {"title": "Cartagena, Spain", "extract": "Cartagena is a coastal city in Spain. It has a port."}}}}
@@ -134,6 +146,39 @@ def test_build_provider_chain_respects_order():
     )
     chain = build_provider_chain(config)
     assert [p.name for p in chain] == ["llm", "wikimedia"]
+
+
+def test_build_provider_chain_default_includes_osm():
+    from wanderlens.catalog.providers import build_provider_chain
+    from wanderlens.config import Config
+
+    config = Config(
+        data_dir=Path("."), photos_dir=Path("."), db_path=Path("."), catalog_path=Path("."),
+        vlm_provider="t", vlm_model="t", api_key="k",
+    )
+    assert [p.name for p in build_provider_chain(config)] == ["wikimedia", "openstreetmap", "llm"]
+
+
+def test_osm_provider_maps_features():
+    from wanderlens.catalog.providers import OsmProvider
+
+    overpass = {
+        "elements": [
+            {"tags": {"natural": "coastline"}},
+            {"tags": {"harbour": "yes"}},
+            {"tags": {"historic": "castle"}},
+        ]
+    }
+    session = OsmSession([{"lat": "42.42", "lon": "18.77"}], overpass)
+    text = OsmProvider(session=session, delay=0).describe("Kotor", "Montenegro")
+
+    assert text and "coastal" in text and "marina" in text and "history" in text
+
+
+def test_osm_provider_returns_none_when_missing():
+    from wanderlens.catalog.providers import OsmProvider
+
+    assert OsmProvider(session=OsmSession([], {}), delay=0).describe("Nowhere", "X") is None
 
 
 def _config(tmp_path):
