@@ -5,6 +5,29 @@ from typing import Callable, Iterable, Optional
 import numpy as np
 
 from wanderlens.core.models import Destination, Recommendation, TasteProfile
+from wanderlens.core.vocabulary import canonicalize
+
+
+def taste_attribute_weights(tags: dict[str, float]) -> dict[str, float]:
+    """Aggregate free-text subject tags into normalized canonical attributes."""
+    accumulated: dict[str, float] = {}
+    for tag, weight in tags.items():
+        for attribute in canonicalize(tag):
+            accumulated[attribute] = accumulated.get(attribute, 0.0) + weight
+    total = sum(accumulated.values())
+    if not total:
+        return {}
+    return {attribute: weight / total for attribute, weight in accumulated.items()}
+
+
+def destination_attribute_set(destination: Destination) -> set[str]:
+    text = f"{destination.name} {destination.description} " + " ".join(destination.attributes)
+    return set(canonicalize(text))
+
+
+def _attribute_match(taste_weights: dict[str, float], destination: Destination) -> float:
+    attributes = destination_attribute_set(destination)
+    return sum(taste_weights.get(attribute, 0.0) for attribute in attributes)
 
 
 def taste_embedding(vectors: Iterable[np.ndarray]) -> Optional[np.ndarray]:
@@ -30,14 +53,18 @@ def rank_destinations(
     exclude_countries: Iterable[str] = (),
     top_k: Optional[int] = None,
     vectors: Optional[dict] = None,
+    taste_tags: Optional[dict[str, float]] = None,
+    alpha: float = 0.5,
 ) -> list[Recommendation]:
-    """Deterministic ranking by cosine similarity, excluding visited countries.
+    """Deterministic ranking, excluding visited countries.
 
     ``vectors`` (destination id -> embedding) lets callers supply cached
     embeddings; missing entries fall back to ``embed_text(destination_text(...))``.
+    When ``taste_tags`` is given, the score blends embedding similarity
+    (``alpha``) with a canonical-attribute match (``1 - alpha``).
     """
     excluded = {c.lower() for c in exclude_countries}
-    scored: list[tuple[float, Destination]] = []
+    scored: list[tuple[float, float, float, Destination]] = []
     for destination in destinations:
         if destination.country.lower() in excluded:
             continue
@@ -47,14 +74,26 @@ def rank_destinations(
             if embed_text is None:
                 raise ValueError("embed_text is required when embeddings are not cached")
             vector = embed_text(destination_text(destination))
-        score = float(np.dot(taste, vector))
-        scored.append((score, destination))
-    scored.sort(key=lambda pair: (-pair[0], pair[1].name))
+        embedding_score = float(np.dot(taste, vector))
+        if taste_tags:
+            attribute_score = _attribute_match(taste_tags, destination)
+            score = alpha * embedding_score + (1.0 - alpha) * attribute_score
+        else:
+            attribute_score = None
+            score = embedding_score
+        scored.append((score, embedding_score, attribute_score, destination))
+    scored.sort(key=lambda row: (-row[0], row[3].name))
 
     ranked = scored[:top_k] if top_k is not None else scored
     return [
-        Recommendation(destination=destination, score=score, rank=i)
-        for i, (score, destination) in enumerate(ranked, start=1)
+        Recommendation(
+            destination=destination,
+            score=score,
+            rank=index,
+            embedding_score=embedding_score,
+            attribute_score=attribute_score,
+        )
+        for index, (score, embedding_score, attribute_score, destination) in enumerate(ranked, start=1)
     ]
 
 

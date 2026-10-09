@@ -43,6 +43,8 @@ class Recommendation:
     score: float
     rank: int
     explanation: str = ""
+    embedding_score: Optional[float] = None
+    attribute_score: Optional[float] = None
 
 
 @dataclass
