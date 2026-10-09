@@ -15,8 +15,12 @@ from wanderlens.pipeline.recommend import default_catalog
 CITIES = (
     "3170647\tGenoa\tGenoa\t\t44.40478\t8.94439\tP\tPPLA\tIT\t\t\t\t\t\t580000\tn/a\t\tEurope/Rome\t2023-01-01\n"
     "3169070\tRome\tRome\t\t41.89193\t12.51133\tP\tPPLA\tIT\t\t\t\t\t\t2318895\tn/a\t\tEurope/Rome\t2023-01-01\n"
+    "2562305\tBirkirkara\tBirkirkara\t\t35.897\t14.461\tP\tPPL\tMT\t\t\t\t\t\t21676\tn/a\t\tEurope/Malta\t2023-01-01\n"
 )
-COUNTRIES = "IT\tITA\t380\tIT\tItaly\tRome\t60360000\tEurope\tItaly\tEUR\tEuro\t+39\t.it\tIT\t^\n"
+COUNTRIES = (
+    "IT\tITA\t380\tIT\tItaly\tRome\t60360000\tEurope\tItaly\tEUR\tEuro\t+39\t.it\tIT\t^\n"
+    "MT\tMLT\t470\tMT\tMalta\tValletta\t316000\tEurope\tMalta\tEUR\tEuro\t+356\t.mt\tMT\t^\n"
+)
 
 
 class _Response:
@@ -102,6 +106,25 @@ def test_default_catalog_enriches_then_caches(tmp_path):
     second = default_catalog(config, description_fetcher=stub)
     assert len(calls) == 2, "cache should prevent refetching"
     assert {d.name for d in second.candidates()} == {"Genoa", "Rome"}
+
+
+def test_country_code_for_name(tmp_path):
+    config = _config(tmp_path)
+    from wanderlens.catalog.fetch import country_code_for_name
+
+    assert country_code_for_name(config.catalog_path / "countryInfo.txt", "Malta") == "MT"
+    assert country_code_for_name(config.catalog_path / "countryInfo.txt", "Wakanda") is None
+
+
+def test_eval_catalog_includes_holdout_country(tmp_path):
+    config = _config(tmp_path)
+    from wanderlens.pipeline.evaluate import _eval_catalog
+
+    catalog = _eval_catalog(config, "Malta", description_fetcher=lambda record: "desc")
+
+    countries = {d.country for d in catalog.candidates()}
+    assert "Malta" in countries, "hold-out country must be present as candidates"
+    assert "Italy" in countries
 
 
 def test_described_destination_ranks_above_undescribed():

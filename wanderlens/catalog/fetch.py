@@ -99,6 +99,20 @@ def enrich_records(records: list[dict], fetch=None, delay: float = 0.0) -> list[
     return records
 
 
+def country_code_for_name(countries_path: str | Path, name: str) -> Optional[str]:
+    """Map a country name (e.g. 'Malta') to its GeoNames code ('MT')."""
+    path = Path(countries_path)
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        cols = line.split("\t")
+        if len(cols) >= 5 and cols[4].lower() == name.lower():
+            return cols[0]
+    return None
+
+
 def load_geonames_cities(
     cities_path: str | Path,
     country_codes: Optional[Iterable[str]] = None,
