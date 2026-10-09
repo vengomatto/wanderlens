@@ -2,14 +2,31 @@
 
 Deferred decisions, captured for the next phase. Not commitments — a parking lot.
 
-## v2 — Preference Factors
+## v2 — Rich recommendations (description + why)
 
-- **Trip context** as a Preference Factor: season, companions, pace. (You travel
-  with a toddler and minimise accommodation changes.) Requires data outside the
-  photo archive, so it waits.
+- Every Recommendation must show a **description** of the place **and a "why this
+  is a unique match for *you*"** explanation — referencing the specific facets /
+  attributes / trips it echoes. The current explanation is a generic template.
+- The LLM synthesis seam (`HostedRanker`) is the home for a specific, non-vague
+  "why"; the description comes from the catalog provider.
 - **Explicit in-app feedback**: let the user rate/favourite Recommendations and
-  feed that back into the Taste Profile. Needs a feedback surface; strong signal
-  once the core loop works.
+  feed that back into the Taste Profile.
+
+## v2 — Traveler context (questions)
+
+- Capture context a photo archive cannot: **age, language(s), travelling with
+  family/friends, ages of children**, season, pace, budget, mobility.
+- Elicit via a **short questionnaire per trip-search iteration**, with sensible
+  **defaults** from past answers and the profile; persist so it sharpens over
+  time. (Supersedes the earlier "trip context" note: you travel with a toddler
+  and minimise accommodation changes.)
+- Feeds ranking, the explanation, and the **novelty-vs-familiarity** balance.
+
+## v2 — Itinerary design
+
+- Once a Destination is chosen, **smartly design an itinerary** (day-by-day),
+  grounded in the user's taste/photos and the traveler context (children ages,
+  pace, season, distance between stops).
 
 ## Destination granularity (areas, not municipalities)
 
