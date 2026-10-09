@@ -63,6 +63,24 @@ wanderlens/
 
 Data (`data/`) is git-ignored: photos, the SQLite database, model files, catalog.
 
+## Destination descriptions (providers)
+
+Candidate destinations are described by an ordered chain of providers; the first
+non-empty description wins and is cached. Wikimedia is one provider, not the only
+one. Configure the order via env/config:
+
+- `wikimedia` (default) — Wikipedia extracts / Wikidata descriptions, free.
+- `llm` (default fallback) — one sentence from a hosted LLM, search-grounded by
+  default (`openai/gpt-4o-mini:online`).
+
+```bash
+WANDERLENS_DESCRIPTION_PROVIDERS=wikimedia,llm
+WANDERLENS_LLM_MODEL=openai/gpt-4o-mini:online
+```
+
+Only place names are sent to the LLM — never photos. Results are cached in
+`data/catalog/destinations*.json`, so each place is described at most once.
+
 ## Testing
 
 ```bash

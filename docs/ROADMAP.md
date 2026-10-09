@@ -21,6 +21,15 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
 - v1 is single-user, but foundations must not assume it stays that way
   (see the multi-user foundation decision in the ADRs / session).
 
+## Providers
+
+- Destination descriptions come from an ordered provider chain. Implemented:
+  `wikimedia` (Wikipedia/Wikidata) and `llm` (OpenRouter, search-grounded).
+  Order is configurable. Next candidates: OpenTripMap (POIs) and a curated
+  local file.
+- Attribute tags from the VLM are still freeform comma lists; move to structured
+  extraction constrained to the shared vocabulary.
+
 ## Known limitations
 
 - **Ranking now uses attribute matching** over the shared vocabulary, blended
