@@ -57,6 +57,10 @@ class OnnxClipEmbedder:
         self._text = None
 
     @property
+    def name(self) -> str:
+        return DEFAULT_REPO_DIRNAME
+
+    @property
     def dim(self) -> int:
         return 512
 

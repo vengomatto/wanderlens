@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS photo_embeddings (
     PRIMARY KEY (user_id, photo_id)
 );
 
+CREATE TABLE IF NOT EXISTS destination_embeddings (
+    destination_id  TEXT    NOT NULL,
+    model           TEXT    NOT NULL,
+    dim             INTEGER NOT NULL,
+    vector          BLOB    NOT NULL,
+    PRIMARY KEY (destination_id, model)
+);
+
 CREATE TABLE IF NOT EXISTS trips (
     user_id     INTEGER NOT NULL,
     id          INTEGER NOT NULL,

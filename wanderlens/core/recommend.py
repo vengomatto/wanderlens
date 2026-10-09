@@ -26,17 +26,28 @@ def destination_text(destination: Destination) -> str:
 def rank_destinations(
     taste: np.ndarray,
     destinations: Iterable[Destination],
-    embed_text: Callable[[str], np.ndarray],
+    embed_text: Optional[Callable[[str], np.ndarray]] = None,
     exclude_countries: Iterable[str] = (),
     top_k: Optional[int] = None,
+    vectors: Optional[dict] = None,
 ) -> list[Recommendation]:
-    """Deterministic ranking by cosine similarity, excluding visited countries."""
+    """Deterministic ranking by cosine similarity, excluding visited countries.
+
+    ``vectors`` (destination id -> embedding) lets callers supply cached
+    embeddings; missing entries fall back to ``embed_text(destination_text(...))``.
+    """
     excluded = {c.lower() for c in exclude_countries}
     scored: list[tuple[float, Destination]] = []
     for destination in destinations:
         if destination.country.lower() in excluded:
             continue
-        score = float(np.dot(taste, embed_text(destination_text(destination))))
+        if vectors is not None and destination.id in vectors:
+            vector = vectors[destination.id]
+        else:
+            if embed_text is None:
+                raise ValueError("embed_text is required when embeddings are not cached")
+            vector = embed_text(destination_text(destination))
+        score = float(np.dot(taste, vector))
         scored.append((score, destination))
     scored.sort(key=lambda pair: (-pair[0], pair[1].name))
 
