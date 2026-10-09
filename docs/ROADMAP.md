@@ -21,11 +21,12 @@ Deferred decisions, captured for the next phase. Not commitments — a parking l
 - v1 is single-user, but foundations must not assume it stays that way
   (see the multi-user foundation decision in the ADRs / session).
 
-## Known limitations (from v1 build)
+## Known limitations
 
-- **Destination text is thin.** The GeoNames catalog supplies only a
-  `Name, Country` string, so recommendation and evaluation match on almost no
-  signal. The first held-out evaluation did not resurface Malta. Enrich
-  Destinations with Wikidata descriptions/tags before trusting ranking quality.
+- **Destination descriptions are now enriched** (Wikipedia extracts / Wikidata
+  descriptions), which fixed the held-out evaluation: Malta resurfaces at rank 1.
+  Ranking quality is still coarse, though — scores cluster tightly and taste is
+  the mean of all photos. Tune the taste vector and consider attribute matching
+  over the shared vocabulary next.
 - **Trip splitting** is a fixed 18h / 150km heuristic; the Malta archive split
   into 2 trips over one overnight gap. Make thresholds configurable.
