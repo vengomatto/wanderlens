@@ -69,6 +69,13 @@ python3 -c "import zipfile; zipfile.ZipFile('/tmp/c.zip').extractall('data/catal
 curl -sL https://download.geonames.org/export/dump/countryInfo.txt -o data/catalog/countryInfo.txt
 ```
 
+To pull photos from a pCloud public folder link (walks subfolders, skips
+already-downloaded files):
+
+```bash
+.venv/bin/python scripts/download_pcloud.py --code <public-link-code>
+```
+
 ## Use
 
 ```bash
