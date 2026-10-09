@@ -55,14 +55,14 @@ class FakeRanker:
         return recommendations
 
 
-def _destination(name, country, attribute):
-    return Destination(id=name, name=name, lat=1.0, lon=1.0, country=country, attributes=[attribute])
+def _destination(name, country, attribute, lat=1.0, lon=1.0):
+    return Destination(id=name, name=name, lat=lat, lon=lon, country=country, attributes=[attribute])
 
 
 DESTINATIONS = [
-    _destination("Coastland", "Croatia", "coastal"),
-    _destination("Peakville", "Greece", "mountain"),
-    _destination("Metropolis", "Malta", "city"),
+    _destination("Coastland", "Croatia", "coastal", 44.0, 15.0),
+    _destination("Peakville", "Greece", "mountain", 39.0, 22.0),
+    _destination("Metropolis", "Malta", "city", 35.90, 14.51),
 ]
 
 
@@ -89,6 +89,21 @@ def test_rank_is_repeatable():
 def test_taste_embedding_normalized():
     vector = taste_embedding([np.array([1.0, 1.0], dtype=np.float32)])
     assert abs(float(np.linalg.norm(vector)) - 1.0) < 1e-6
+
+
+def test_best_matching_facet_scores_destination():
+    facets = [
+        np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        np.array([0.0, 1.0, 0.0], dtype=np.float32),
+    ]
+
+    def embed_text(text):
+        return np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    destination = Destination(id="d", name="D", lat=1, lon=1, country="X", description="")
+    recs = rank_destinations(None, [destination], embed_text, taste_facets=facets)
+
+    assert recs[0].embedding_score == 1.0  # matches the second facet, not the first
 
 
 def test_taste_attribute_weights_canonicalizes_and_normalizes():
@@ -134,6 +149,10 @@ def _seed(tmp_path):
     conn = connect(config.db_path)
     init_db(conn)
     conn.execute("INSERT INTO users (id, name) VALUES (1, 'owner')")
+    conn.execute(
+        "INSERT INTO trips (user_id, id, start_at, end_at, country, city, lat, lon) "
+        "VALUES (1, 0, NULL, NULL, 'Malta', 'Valletta', 35.90, 14.51)"
+    )
     for i in range(3):
         conn.execute(
             "INSERT INTO photo_embeddings (user_id, photo_id, dim, vector) VALUES (1, ?, 3, ?)",
@@ -178,7 +197,7 @@ def test_destination_embeddings_are_cached(tmp_path):
 
     run_recommend(config, count=5, embedder=embedder, catalog=catalog)
     first = embedder.text_calls
-    assert first == len(DESTINATIONS)
+    assert first == 2  # Metropolis (Malta) is excluded by proximity
 
     run_recommend(config, count=5, embedder=embedder, catalog=catalog)
     assert embedder.text_calls == first, "destination embeddings should be cached"

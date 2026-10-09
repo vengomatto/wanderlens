@@ -90,8 +90,32 @@ def test_run_profile_stores_factors_and_embeddings(tmp_path):
     conn.row_factory = sqlite3.Row
     entries = {(r["factor"], r["key"]): r["value"] for r in conn.execute("SELECT * FROM profile_entries")}
     assert entries[("geography", "Italy")] == 1.0
-    assert ("subjects", "coastal cliffs") in entries
+    assert ("subjects", "coastal") in entries
     assert conn.execute("SELECT COUNT(*) FROM photo_embeddings").fetchone()[0] == 3
+
+
+def test_attributes_weighted_by_trip_recurrence(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)  # two trips: a,b (one trip) and c (another)
+
+    class PerTripVision:
+        def __init__(self):
+            self.n = 0
+
+        def describe(self, paths):
+            self.n += 1
+            return ["coastal cliffs"] if self.n == 1 else ["mountains"]
+
+    run_profile(config, embedder=FakeEmbedder(), vision=PerTripVision(), reverse_geocoder=_italy)
+
+    import sqlite3
+
+    conn = sqlite3.connect(config.db_path)
+    conn.row_factory = sqlite3.Row
+    entries = {r["key"]: r["value"] for r in conn.execute("SELECT * FROM profile_entries WHERE factor='subjects'")}
+    # coastal appears in trip 1 only (1/2); mountains in trip 2 only (1/2)
+    assert entries["coastal"] == 0.5
+    assert entries["mountains"] == 0.5
 
 
 def test_subjects_require_vision_optin(tmp_path):
@@ -120,7 +144,7 @@ def test_show_profile_reports_factors(tmp_path):
     text = show_profile(config)
 
     assert "Italy" in text
-    assert "coastal cliffs" in text
+    assert "coastal" in text
     assert "Trips: 2" in text
 
 
