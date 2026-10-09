@@ -10,11 +10,12 @@ from wanderlens.catalog.fetch import (
     load_geonames_cities,
 )
 from wanderlens.core.evaluate import evaluate_holdout
-from wanderlens.core.recommend import rank_destinations
+from wanderlens.core.recommend import rank_destinations, taste_attribute_weights
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.recommend import (
     DEFAULT_CANDIDATE_COUNTRIES,
     ensure_destination_embeddings,
+    load_profile,
     load_taste_embedding,
 )
 
@@ -95,6 +96,7 @@ def run_eval(
     catalog = catalog or _eval_catalog(config, holdout, description_fetcher=description_fetcher)
     candidates = catalog.candidates()
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
+    profile = load_profile(conn, user_id, embedding=taste)
     ranked = rank_destinations(
         taste,
         candidates,
@@ -102,6 +104,7 @@ def run_eval(
         exclude_countries=remaining,
         top_k=None,
         vectors=vectors,
+        taste_tags=taste_attribute_weights(profile.tags),
     )
     result = evaluate_holdout(ranked, holdout, within_top)
     return result.describe()

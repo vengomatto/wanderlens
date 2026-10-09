@@ -37,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rec = sub.add_parser("recommend", help="recommend new destinations")
     p_rec.add_argument("--count", type=int, default=5, help="number of recommendations")
+    p_rec.add_argument(
+        "--alpha",
+        type=float,
+        default=0.5,
+        help="weight of embedding similarity vs attribute match (0..1)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -82,12 +88,17 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     from wanderlens.pipeline.recommend import run_recommend
 
     config = load_config(args.config)
-    recs = run_recommend(config, user_name=args.user, count=args.count)
+    recs = run_recommend(config, user_name=args.user, count=args.count, alpha=args.alpha)
     if not recs:
         print("No recommendations.")
         return 0
     for rec in recs:
-        print(f"{rec.rank}. {rec.destination.name} ({rec.destination.country}) - {rec.score:.3f}")
+        emb = f"{rec.embedding_score:.3f}" if rec.embedding_score is not None else "-"
+        attr = f"{rec.attribute_score:.3f}" if rec.attribute_score is not None else "-"
+        print(
+            f"{rec.rank}. {rec.destination.name} ({rec.destination.country}) "
+            f"- {rec.score:.3f}  [emb {emb} / attr {attr}]"
+        )
         if rec.explanation:
             print(f"   {rec.explanation}")
     return 0

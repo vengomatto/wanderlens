@@ -8,7 +8,13 @@ import numpy as np
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
 from wanderlens.core.models import Recommendation, TasteProfile
-from wanderlens.core.recommend import destination_text, explain, rank_destinations, taste_embedding
+from wanderlens.core.recommend import (
+    destination_text,
+    explain,
+    rank_destinations,
+    taste_attribute_weights,
+    taste_embedding,
+)
 from wanderlens.db import connect, init_db
 
 DEFAULT_CANDIDATE_COUNTRIES = ["GR", "HR", "ES", "PT", "CY", "IT", "FR", "TR", "ME", "AL"]
@@ -85,6 +91,7 @@ def run_recommend(
     embedder=None,
     catalog: Optional[JsonCatalog] = None,
     ranker=None,
+    alpha: float = 0.5,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -113,6 +120,7 @@ def run_recommend(
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     candidates = catalog.candidates()
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
+    profile = load_profile(conn, user_id, embedding=taste)
     recommendations = rank_destinations(
         taste,
         candidates,
@@ -120,9 +128,10 @@ def run_recommend(
         exclude_countries=visited,
         top_k=count,
         vectors=vectors,
+        taste_tags=taste_attribute_weights(profile.tags),
+        alpha=alpha,
     )
 
-    profile = load_profile(conn, user_id, embedding=taste)
     if ranker is not None:
         recommendations = ranker.rank(recommendations, profile)
     else:
