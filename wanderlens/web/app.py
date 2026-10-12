@@ -119,6 +119,7 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             "region_geojson": detail.region_geojson,
             "region_kind": detail.region_kind,
             "region_radius_km": detail.region_radius_km,
+            "pois": detail.pois,
         }
         return render(
             request,

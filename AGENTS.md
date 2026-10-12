@@ -4,7 +4,7 @@
 
 - Run tests: `.venv/bin/python -m pytest -q`
 - End-to-end smoke: `bash scripts/smoke.sh`
-- CLI: `.venv/bin/python -m wanderlens <ingest|profile show|recommend|eval|serve>`
+- CLI: `.venv/bin/python -m wanderlens <ingest|profile show|recommend|eval|serve|guide>`
 - Web dashboard (local, read-only): `.venv/bin/python -m wanderlens serve`
 
 ## Conventions

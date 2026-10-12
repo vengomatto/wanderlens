@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from wanderlens.db import connect, init_db
@@ -70,6 +72,40 @@ def _seed(tmp_path):
         "INSERT INTO destination_embeddings (destination_id, model, dim, vector) VALUES ('wy:algarve', 'test', 3, ?)",
         (np.array([1.0, 0.0, 0.0], dtype=np.float32).tobytes(),),
     )
+    conn.execute(
+        "INSERT INTO destination_guide "
+        "(destination_id, understand, links, books, pois, climate, films, fetched_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, 'now')",
+        (
+            "wy:algarve",
+            "Travel prose about the Algarve from Wikivoyage.",
+            json.dumps([{"label": "Wikivoyage", "url": "https://en.wikivoyage.org/wiki/Algarve"}]),
+            json.dumps([{"title": "Algarve Blues", "author": "A. Author", "url": "https://openlibrary.org/x"}]),
+            json.dumps([{"name": "Benagil Cave", "kind": "see", "lat": 37.08, "lon": -8.42}]),
+            json.dumps([{"month": m, "temp_c": 10 + m, "precip_mm": 50} for m in range(1, 13)]),
+            json.dumps([{"title": "The Last Train to Lisbon", "url": "http://wikidata/Q1"}]),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO destination_itineraries "
+        "(destination_id, position, title, summary, days, source, model, prompt_version, url, fetched_at) "
+        "VALUES ('wy:algarve', 0, 'Algarve coast itinerary', '', '[]', 'wikivoyage', '', '', "
+        " 'https://en.wikivoyage.org/wiki/Algarve_coast_itinerary', 'now')"
+    )
+    conn.execute(
+        "INSERT INTO destination_itineraries "
+        "(destination_id, position, title, summary, days, source, model, prompt_version, url, fetched_at) "
+        "VALUES ('wy:algarve', 1, 'Algarve in 4 days', '', ?, 'llm', 'test-model', 'itinerary-v1', '', 'now')",
+        (json.dumps([{"title": "Day 1", "summary": "Arrive", "items": ["Beach"]}]),),
+    )
+    conn.execute(
+        "INSERT INTO recommendations (user_id, run_id, rank, destination_id, score, destination_name, "
+        "destination_country) VALUES (1, 1, 2, 'wy:epirus', 0.5, 'Epirus', 'Greece')"
+    )
+    conn.execute(
+        "INSERT INTO destination_embeddings (destination_id, model, dim, vector) VALUES ('wy:epirus', 'test', 3, ?)",
+        (np.array([0.9, 0.1, 0.0], dtype=np.float32).tobytes(),),
+    )
     conn.commit()
     return conn
 
@@ -123,8 +159,8 @@ def test_recommendations_view_maps_display_fields(tmp_path):
     conn = _seed(tmp_path)
     recs = views.recommendations_view(conn, 1)
 
-    assert len(recs) == 1
-    rec = recs[0]
+    assert len(recs) == 2
+    rec = next(r for r in recs if r.destination_id == "wy:algarve")
     assert rec.name == "Algarve"
     assert rec.country == "Portugal"
     assert rec.score == 0.83
@@ -137,12 +173,12 @@ def test_recommendations_view_falls_back_when_columns_null(tmp_path):
     conn = _seed(tmp_path)
     conn.execute(
         "INSERT INTO recommendations (user_id, run_id, rank, destination_id, score) "
-        "VALUES (1, 1, 2, 'wy:epirus', 0.5)"
+        "VALUES (1, 1, 3, 'wy:unknown', 0.5)"
     )
     conn.commit()
 
-    rec = views.recommendations_view(conn, 1)[1]
-    assert rec.name == "wy:epirus"
+    rec = next(r for r in views.recommendations_view(conn, 1) if r.destination_id == "wy:unknown")
+    assert rec.name == "wy:unknown"
     assert rec.country == ""
     assert rec.lat is None
     assert rec.embedding_score is None
@@ -189,12 +225,6 @@ def test_destination_detail_with_media(tmp_path):
 
 def test_destination_detail_without_media(tmp_path):
     conn = _seed(tmp_path)
-    conn.execute(
-        "INSERT INTO recommendations (user_id, run_id, rank, destination_id, score, "
-        "destination_name, destination_country) VALUES (1, 1, 2, 'wy:epirus', 0.5, 'Epirus', 'Greece')"
-    )
-    conn.commit()
-
     detail = views.destination_detail(conn, 1, "wy:epirus")
     assert detail is not None
     assert detail.extract == ""
@@ -220,3 +250,36 @@ def test_similar_trips_ranks_by_embedding(tmp_path):
 def test_similar_trips_empty_without_embedding(tmp_path):
     conn = _seed(tmp_path)
     assert views.similar_trips(conn, 1, "wy:nowhere") == []
+
+
+def test_destination_detail_guide_sections(tmp_path):
+    conn = _seed(tmp_path)
+    detail = views.destination_detail(conn, 1, "wy:algarve")
+
+    assert detail.understand.startswith("Travel prose")
+    assert detail.links[0]["label"] == "Wikivoyage"
+    assert detail.books[0]["title"] == "Algarve Blues"
+    assert detail.pois[0]["name"] == "Benagil Cave"
+    assert len(detail.climate) == 12
+    assert detail.films[0]["title"] == "The Last Train to Lisbon"
+    sources = {it["source"] for it in detail.itineraries}
+    assert sources == {"wikivoyage", "llm"}
+    assert detail.itineraries[1]["days"][0]["title"] == "Day 1"
+
+
+def test_similar_destinations(tmp_path):
+    conn = _seed(tmp_path)
+    similar = views.similar_destinations(conn, 1, "wy:algarve")
+
+    assert [s["id"] for s in similar] == ["wy:epirus"]
+    assert similar[0]["name"] == "Epirus"
+
+
+def test_destination_detail_without_guide(tmp_path):
+    conn = _seed(tmp_path)
+    detail = views.destination_detail(conn, 1, "wy:epirus")
+
+    assert detail.understand == ""
+    assert detail.links == []
+    assert detail.itineraries == []
+    assert detail.similar_destinations[0]["id"] == "wy:algarve"

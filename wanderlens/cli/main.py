@@ -64,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--port", type=int, default=8000, help="port to listen on")
     p_serve.set_defaults(func=cmd_serve)
 
+    p_guide = sub.add_parser("guide", help="build rich travel guides for the recommended destinations")
+    p_guide.add_argument("--count", type=int, default=None, help="number of destinations")
+    p_guide.add_argument("--refresh", action="store_true", help="rebuild guides even if cached")
+    p_guide.add_argument("--no-llm", action="store_true", help="skip the synthesised itinerary")
+    p_guide.set_defaults(func=cmd_guide)
+
     return parser
 
 
@@ -151,6 +157,29 @@ def cmd_serve(args: argparse.Namespace) -> int:
     app = create_app(config, user_name=args.user)
     print(f"Serving Wanderlens on http://{args.host}:{args.port} (Ctrl-C to stop)")
     uvicorn.run(app, host=args.host, port=args.port)
+    return 0
+
+
+def cmd_guide(args: argparse.Namespace) -> int:
+    from wanderlens.pipeline.guide import run_guide
+
+    config = load_config(args.config)
+    synthesizer = None
+    if not args.no_llm:
+        if config.api_key:
+            from wanderlens.models.ranker import HostedItinerarySynthesizer
+
+            synthesizer = HostedItinerarySynthesizer(config.api_key, config.llm_model)
+        else:
+            print("No API key configured; building guides without a synthesised itinerary.")
+    built = run_guide(
+        config,
+        user_name=args.user,
+        count=args.count,
+        refresh=args.refresh,
+        synthesizer=synthesizer,
+    )
+    print(f"Built guides for {built} destination(s) into {config.db_path}")
     return 0
 
 

@@ -1,0 +1,258 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+from typing import Optional
+from urllib.parse import urlparse
+
+from wanderlens.catalog.fetch import (
+    BOOK_TYPES,
+    FILM_TYPES,
+    fetch_climate,
+    fetch_openlibrary_books,
+    fetch_wikidata_claim,
+    fetch_wikidata_narrative_works,
+    fetch_wikivoyage_page,
+    fetch_wikivoyage_wikitext,
+    parse_pois,
+)
+from wanderlens.core.models import Destination
+
+DEFAULT_ITINERARY_DAYS = 4
+MAX_LINKS = 10
+MAX_UNDERSTAND = 2500
+
+
+def _truncate(text: str, limit: int) -> str:
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,.;:")
+    return cut + "…"
+
+
+def is_guide_cached(conn: sqlite3.Connection, destination_id: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM destination_guide WHERE destination_id = ?", (destination_id,)
+    ).fetchone()
+    return row is not None
+
+
+def gather_guide(
+    destination: Destination,
+    session=None,
+    synthesizer=None,
+    days: int = DEFAULT_ITINERARY_DAYS,
+) -> dict:
+    """Gather every guide section best-effort; a missing source omits its section."""
+    try:
+        voyage = fetch_wikivoyage_page(destination.name, destination.country, session=session)
+    except Exception:
+        voyage = None
+    wikidata_id = (voyage or {}).get("wikidata_id", "")
+
+    pois: list[dict] = []
+    if voyage and voyage.get("title"):
+        try:
+            wikitext = fetch_wikivoyage_wikitext(voyage["title"], session=session)
+            pois = parse_pois(wikitext)
+        except Exception:
+            pois = []
+
+    return {
+        "understand": _truncate((voyage or {}).get("extract", ""), MAX_UNDERSTAND),
+        "links": _links(destination, voyage, wikidata_id, session),
+        "books": _books(destination, wikidata_id, session),
+        "pois": pois,
+        "climate": _climate(destination, session),
+        "films": _films(wikidata_id, session),
+        "itineraries": _itineraries(destination, voyage, pois, synthesizer, days),
+    }
+
+
+def _dedupe(items: list[dict], key: str = "url") -> list[dict]:
+    seen: set[str] = set()
+    out: list[dict] = []
+    for item in items:
+        value = str(item.get(key, "")).strip().lower()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(item)
+    return out
+
+
+def _domain_label(url: str) -> str:
+    host = urlparse(url).netloc or url
+    return host[4:] if host.startswith("www.") else host
+
+
+def _links(destination: Destination, voyage, wikidata_id: str, session) -> list[dict]:
+    links: list[dict] = []
+
+    def add(label: str, url: Optional[str]) -> None:
+        if url:
+            links.append({"label": label, "url": url})
+
+    add("Wikivoyage", (voyage or {}).get("page_url"))
+    if wikidata_id:
+        add(
+            "Official site",
+            fetch_wikidata_claim(wikidata_id, "P856", session=session),
+        )
+    name = destination.name.replace(" ", "_")
+    add("Wikipedia", f"https://en.wikipedia.org/wiki/{name}")
+    add("Wikimedia Commons", f"https://commons.wikimedia.org/wiki/Category:{name}")
+    if destination.lat is not None and destination.lon is not None:
+        add(
+            "OpenStreetMap",
+            f"https://www.openstreetmap.org/?mlat={destination.lat}&mlon={destination.lon}"
+            f"#map=10/{destination.lat}/{destination.lon}",
+        )
+    for url in (voyage or {}).get("external_links", []):
+        if url.startswith("http"):
+            add(_domain_label(url), url)
+    return _dedupe(links)[:MAX_LINKS]
+
+
+def _books(destination: Destination, wikidata_id: str, session) -> list[dict]:
+    books: list[dict] = []
+    try:
+        books += fetch_openlibrary_books(destination.name, session=session)
+    except Exception:
+        pass
+    if wikidata_id:
+        try:
+            books += fetch_wikidata_narrative_works(wikidata_id, BOOK_TYPES, session=session)
+        except Exception:
+            pass
+    return _dedupe(books, key="title")
+
+
+def _films(wikidata_id: str, session) -> list[dict]:
+    if not wikidata_id:
+        return []
+    try:
+        return _dedupe(
+            fetch_wikidata_narrative_works(wikidata_id, FILM_TYPES, session=session),
+            key="title",
+        )
+    except Exception:
+        return []
+
+
+def _climate(destination: Destination, session) -> list[dict]:
+    if destination.lat is None or destination.lon is None:
+        return []
+    try:
+        return fetch_climate(destination.lat, destination.lon, session=session)
+    except Exception:
+        return []
+
+
+def _itineraries(destination, voyage, pois, synthesizer, days) -> list[dict]:
+    itineraries: list[dict] = []
+    for item in (voyage or {}).get("itineraries", []):
+        itineraries.append(
+            {
+                "title": item.get("title", ""),
+                "summary": "",
+                "url": item.get("url", ""),
+                "source": "wikivoyage",
+                "days": [],
+            }
+        )
+    if synthesizer is not None:
+        try:
+            plan = synthesizer.synthesize(destination, pois, days)
+        except Exception:
+            plan = []
+        if plan:
+            itineraries.append(
+                {
+                    "title": f"{destination.name} in {days} days",
+                    "summary": "",
+                    "url": "",
+                    "source": "llm",
+                    "model": getattr(synthesizer, "model", ""),
+                    "prompt_version": getattr(synthesizer, "prompt_version", ""),
+                    "days": plan,
+                }
+            )
+    return itineraries
+
+
+def store_guide(conn: sqlite3.Connection, destination_id: str, data: dict) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "INSERT OR REPLACE INTO destination_guide "
+        "(destination_id, understand, links, books, pois, climate, films, fetched_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            destination_id,
+            data.get("understand", ""),
+            json.dumps(data.get("links", [])),
+            json.dumps(data.get("books", [])),
+            json.dumps(data.get("pois", [])),
+            json.dumps(data.get("climate", [])),
+            json.dumps(data.get("films", [])),
+            now,
+        ),
+    )
+    conn.execute("DELETE FROM destination_itineraries WHERE destination_id = ?", (destination_id,))
+    for position, itinerary in enumerate(data.get("itineraries", [])):
+        conn.execute(
+            "INSERT INTO destination_itineraries "
+            "(destination_id, position, title, summary, days, source, model, prompt_version, url, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                destination_id,
+                position,
+                itinerary.get("title", ""),
+                itinerary.get("summary", ""),
+                json.dumps(itinerary.get("days", [])),
+                itinerary.get("source", ""),
+                itinerary.get("model", ""),
+                itinerary.get("prompt_version", ""),
+                itinerary.get("url", ""),
+                now,
+            ),
+        )
+    conn.commit()
+
+
+def fetch_guide(
+    conn: sqlite3.Connection,
+    destination: Destination,
+    session=None,
+    synthesizer=None,
+    days: int = DEFAULT_ITINERARY_DAYS,
+    refresh: bool = False,
+) -> bool:
+    """Build and cache one guide. Returns whether it was (re)built."""
+    if not refresh and is_guide_cached(conn, destination.id):
+        return False
+    data = gather_guide(destination, session=session, synthesizer=synthesizer, days=days)
+    store_guide(conn, destination.id, data)
+    return True
+
+
+def build_guides_for(
+    conn: sqlite3.Connection,
+    destinations,
+    session=None,
+    synthesizer=None,
+    days: int = DEFAULT_ITINERARY_DAYS,
+    refresh: bool = False,
+) -> int:
+    built = 0
+    for destination in destinations:
+        try:
+            if fetch_guide(
+                conn, destination, session=session, synthesizer=synthesizer, days=days, refresh=refresh
+            ):
+                built += 1
+        except Exception:
+            continue
+    return built

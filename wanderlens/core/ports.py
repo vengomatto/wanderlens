@@ -64,3 +64,14 @@ class ExplanationSynthesizer(Protocol):
 
     def synthesize(self, evidence: dict) -> str:
         ...
+
+
+class ItinerarySynthesizer(Protocol):
+    """Synthesises a day-by-day itinerary from gathered points of interest.
+    Injectable and pinned; a failure must leave the run without an itinerary."""
+
+    name: str
+    prompt_version: str
+
+    def synthesize(self, destination: Destination, pois: list, days: int) -> list:
+        ...

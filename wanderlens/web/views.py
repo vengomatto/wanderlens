@@ -96,6 +96,14 @@ class DestinationDetail:
     matched_attributes: list[tuple[str, float]] = field(default_factory=list)
     best_trip_label: str = ""
     nearest_trip_km: Optional[float] = None
+    understand: str = ""
+    links: list[dict] = field(default_factory=list)
+    books: list[dict] = field(default_factory=list)
+    pois: list[dict] = field(default_factory=list)
+    climate: list[dict] = field(default_factory=list)
+    films: list[dict] = field(default_factory=list)
+    itineraries: list[dict] = field(default_factory=list)
+    similar_destinations: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -141,6 +149,56 @@ def _matched_attributes(raw) -> list[tuple[str, float]]:
     if not isinstance(data, dict):
         return []
     return sorted(((k, float(v)) for k, v in data.items()), key=lambda item: -item[1])
+
+
+def _json_list(raw) -> list:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _embedding(conn, destination_id):
+    row = conn.execute(
+        "SELECT vector FROM destination_embeddings WHERE destination_id = ? LIMIT 1",
+        (destination_id,),
+    ).fetchone()
+    return np.frombuffer(row["vector"], dtype=np.float32) if row else None
+
+
+def similar_destinations(
+    conn: sqlite3.Connection, user_id: int, destination_id: str, limit: int = 4
+) -> list[dict]:
+    base = _embedding(conn, destination_id)
+    if base is None:
+        return []
+    base_norm = float(np.linalg.norm(base)) or 1.0
+    scored: list[tuple[float, dict]] = []
+    rows = conn.execute(
+        "SELECT destination_id, destination_name, destination_country FROM recommendations "
+        "WHERE user_id = ? AND destination_id <> ? ORDER BY rank",
+        (user_id, destination_id),
+    ).fetchall()
+    for row in rows:
+        vector = _embedding(conn, row["destination_id"])
+        if vector is None:
+            continue
+        denom = base_norm * (float(np.linalg.norm(vector)) or 1.0)
+        scored.append(
+            (
+                float(np.dot(base, vector)) / denom,
+                {
+                    "id": row["destination_id"],
+                    "name": row["destination_name"] or row["destination_id"],
+                    "country": row["destination_country"] or "",
+                },
+            )
+        )
+    scored.sort(key=lambda item: -item[0])
+    return [item for _, item in scored[:limit]]
 
 
 def trips_view(conn: sqlite3.Connection, user_id: int) -> list[TripView]:
@@ -296,6 +354,27 @@ def destination_detail(
         )
     ]
 
+    guide = conn.execute(
+        "SELECT understand, links, books, pois, climate, films FROM destination_guide "
+        "WHERE destination_id = ?",
+        (destination_id,),
+    ).fetchone()
+    itineraries = [
+        {
+            "title": row["title"] or "",
+            "summary": row["summary"] or "",
+            "days": _json_list(row["days"]),
+            "source": row["source"] or "",
+            "model": row["model"] or "",
+            "url": row["url"] or "",
+        }
+        for row in conn.execute(
+            "SELECT title, summary, days, source, model, url FROM destination_itineraries "
+            "WHERE destination_id = ? ORDER BY position",
+            (destination_id,),
+        )
+    ]
+
     return DestinationDetail(
         destination_id=destination_id,
         name=(rec["destination_name"] if rec else "") or destination_id,
@@ -321,6 +400,14 @@ def destination_detail(
         matched_attributes=_matched_attributes(rec["matched_attributes"]) if rec else [],
         best_trip_label=(rec["best_trip_label"] if rec else "") or "",
         nearest_trip_km=rec["nearest_trip_km"] if rec else None,
+        understand=(guide["understand"] if guide else "") or "",
+        links=_json_list(guide["links"]) if guide else [],
+        books=_json_list(guide["books"]) if guide else [],
+        pois=_json_list(guide["pois"]) if guide else [],
+        climate=_json_list(guide["climate"]) if guide else [],
+        films=_json_list(guide["films"]) if guide else [],
+        itineraries=itineraries,
+        similar_destinations=similar_destinations(conn, user_id, destination_id),
     )
 
 

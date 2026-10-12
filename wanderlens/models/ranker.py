@@ -81,3 +81,41 @@ class HostedExplanationSynthesizer:
     def synthesize(self, evidence: dict) -> str:
         prompt = _EXPLAIN_SYSTEM + "\n\nFacts:\n" + json.dumps(evidence, ensure_ascii=False)
         return (self.text.complete(prompt) or "").strip()
+
+
+_ITINERARY_PROMPT_VERSION = "itinerary-v1"
+
+_ITINERARY_SYSTEM = (
+    "You design a concise day-by-day travel itinerary. Return ONLY a JSON array "
+    "of objects with keys 'title', 'summary', and 'items' (a list of short "
+    "strings), one object per day. Base it only on the given destination and "
+    "points of interest; do not invent places. No markdown, no preamble."
+)
+
+
+class HostedItinerarySynthesizer:
+    """Builds a day-by-day itinerary from gathered POIs. Pinned model + prompt."""
+
+    name = "llm"
+    prompt_version = _ITINERARY_PROMPT_VERSION
+
+    def __init__(self, api_key: str | None, model: str, timeout: int = 90):
+        self.model = model
+        self.text = HostedTextModel(api_key, model, timeout)
+
+    def synthesize(self, destination, pois: list, days: int) -> list:
+        payload = {
+            "destination": destination.name,
+            "country": destination.country,
+            "days": days,
+            "points_of_interest": [p.get("name") for p in pois if p.get("name")][:30],
+        }
+        text = self.text.complete(_ITINERARY_SYSTEM + "\n\n" + json.dumps(payload, ensure_ascii=False))
+        start, end = text.find("["), text.rfind("]")
+        if start < 0 or end <= start:
+            return []
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except ValueError:
+            return []
+        return parsed if isinstance(parsed, list) else []

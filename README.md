@@ -85,6 +85,7 @@ already-downloaded files):
 .venv/bin/python -m wanderlens profile show
 .venv/bin/python -m wanderlens recommend --count 5
 .venv/bin/python -m wanderlens eval [--holdout Malta]
+.venv/bin/python -m wanderlens guide [--count 5] [--refresh] [--no-llm]
 ```
 
 The "why this is for you" is evidence-based: each Recommendation names the
@@ -113,7 +114,10 @@ localhost and single-user; front-end assets are vendored so it works offline.
 Recommendations now carry **pictures and a real destination page**. When you run
 `recommend`, each recommended Destination also fetches a Wikipedia image, an
 expanded description, and a region shape from free, keyless sources, cached under
-`data/media/` and in the database. From a card, `/destinations/{id}` opens a page
+`data/media/` and in the database. Galleries are sourced from **curated place
+imagery** — the item's Wikidata image, the article's own media, and the place's
+Commons category — filtered for quality, with a proximity search only as a
+fallback. From a card, `/destinations/{id}` opens a page
 with a hero image, the full description (with source and attribution), a **world
 locator and a regional map** highlighting the area — a precise boundary when one
 exists, an "approximate" circle otherwise — and your own most-similar trip photos
@@ -122,6 +126,17 @@ exists, an "approximate" circle otherwise — and your own most-similar trip pho
 Maps use **keyless** OpenStreetMap tiles by default (darkened in dark mode). To
 point them at another provider (including a keyed one), set `WANDERLENS_TILE_URL`
 and `WANDERLENS_TILE_ATTRIBUTION`.
+
+### Travel guides
+
+`wanderlens guide` builds a richer page for each recommended destination, cached
+and rendered offline: a travel-oriented description (Wikivoyage), a photo gallery
+(≥10 where available), points of interest plotted on the map, a per-month climate
+summary (Open-Meteo), books to read (Wikidata + Open Library), films/series set
+there, resource links, similar destinations, and suggested itineraries. Curated
+itineraries come from Wikivoyage; with an API key, `guide` also synthesises a
+day-by-day itinerary with the LLM (pinned prompt, cached, marked "AI-generated",
+with sources) — use `--no-llm` to skip it, `--refresh` to rebuild.
 
 `--tag` sends a small sample of photos (~3 per trip) to the configured vision
 model. Without it, subject tags are skipped; geography and aesthetics are still

@@ -7,56 +7,180 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-from wanderlens.catalog.fetch import fetch_commons_gallery, fetch_wikipedia_media
+from wanderlens.catalog.fetch import (
+    fetch_commons_category,
+    fetch_commons_gallery,
+    fetch_commons_imageinfo,
+    fetch_wikidata_commons_category,
+    fetch_wikidata_item_image,
+    fetch_wikipedia_article_images,
+    fetch_wikipedia_media,
+    fetch_wikivoyage_page,
+)
 from wanderlens.catalog.regions import resolve_region
 from wanderlens.core.models import Destination, DestinationMedia, MediaImage
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+GALLERY_LIMIT = 15
+FALLBACK_MIN = 4
+GOOD_MIMES = {"image/jpeg", "image/png", "image/webp"}
+MIN_WIDTH = 800
+BAD_TITLE_WORDS = (
+    "icon",
+    "logo",
+    "map of",
+    "locator",
+    "location map",
+    "flag",
+    "coat of arms",
+    "coat_of_arms",
+    "diagram",
+    "chart",
+    "symbol",
+    "banner",
+    "emblem",
+    "commons-logo",
+    "wikimedia",
+    "edit-",
+    "disambig",
+    "question book",
+    "schematic",
+)
+
+
+def filter_images(images: list[dict], min_width: int = MIN_WIDTH, limit: int = GALLERY_LIMIT) -> list[dict]:
+    """Keep usable photographs: photo mime, enough resolution, no blocklisted titles, deduped."""
+    seen: set[str] = set()
+    kept: list[dict] = []
+    for image in images:
+        title = (image.get("title") or "").lower()
+        if image.get("mime") not in GOOD_MIMES:
+            continue
+        if int(image.get("width") or 0) < min_width:
+            continue
+        if any(word in title for word in BAD_TITLE_WORDS):
+            continue
+        key = title or image.get("url", "")
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(image)
+        if len(kept) >= limit:
+            break
+    return kept
+
+
+def _safe(call, *args, **kwargs):
+    try:
+        return call(*args, **kwargs)
+    except Exception:
+        return None
 
 
 class WikimediaMediaProvider:
-    """Wikipedia hero image + expanded extract, plus a Commons gallery nearby."""
+    """Travel-oriented description (Wikivoyage) + Wikipedia hero + Commons gallery."""
 
     name = "wikimedia"
 
-    def __init__(self, session=None):
+    def __init__(self, session=None, gallery_limit: int = GALLERY_LIMIT):
         self.session = session
+        self.gallery_limit = gallery_limit
 
     def fetch(self, destination: Destination) -> Optional[DestinationMedia]:
-        try:
-            data = fetch_wikipedia_media(
-                destination.name, destination.country, session=self.session
-            )
-        except Exception:
-            data = None
-        if not data:
+        voyage = _safe(
+            fetch_wikivoyage_page, destination.name, destination.country, session=self.session
+        )
+        wiki = _safe(
+            fetch_wikipedia_media, destination.name, destination.country, session=self.session
+        )
+        if not voyage and not wiki:
             return None
 
-        media = DestinationMedia(
-            destination_id=destination.id,
-            title=data.get("title", ""),
-            page_url=data.get("page_url", ""),
-            extract=data.get("extract", ""),
-            source=self.name,
-        )
-        if data.get("image_url"):
-            media.images.append(
+        extract = (voyage or {}).get("extract") or (wiki or {}).get("extract", "")
+        page_url = (voyage or {}).get("page_url") or (wiki or {}).get("page_url", "")
+        title = (wiki or {}).get("title") or (voyage or {}).get("title", "")
+        wikidata_id = (voyage or {}).get("wikidata_id", "")
+
+        hero: Optional[dict] = None
+        curated: list[dict] = []
+        if wikidata_id:
+            item_images = _safe(fetch_wikidata_item_image, wikidata_id, session=self.session) or []
+            if item_images:
+                hero = item_images[0]
+                curated.extend(item_images[1:])
+        if hero is None and wiki and wiki.get("image_url"):
+            hero = {
+                "url": wiki["image_url"],
+                "source": "wikipedia",
+                "license": wiki.get("image_license", ""),
+                "attribution": wiki.get("image_attribution", "Wikipedia"),
+            }
+
+        if title:
+            files = _safe(fetch_wikipedia_article_images, title, session=self.session) or []
+            curated.extend(_safe(fetch_commons_imageinfo, files, session=self.session) or [])
+        category = (
+            _safe(fetch_wikidata_commons_category, wikidata_id, session=self.session)
+            if wikidata_id
+            else None
+        ) or destination.name
+        curated.extend(_safe(fetch_commons_category, category, session=self.session) or [])
+
+        gallery = filter_images(curated)
+
+        images: list[MediaImage] = []
+        hero_url = hero["url"] if hero else None
+        if hero:
+            images.append(
                 MediaImage(
-                    url=data["image_url"],
-                    source="wikipedia",
-                    license=data.get("image_license", ""),
-                    attribution=data.get("image_attribution", ""),
+                    url=hero_url,
+                    source=hero.get("source", ""),
+                    license=hero.get("license", ""),
+                    attribution=hero.get("attribution", ""),
                 )
             )
-        if destination.lat is not None and destination.lon is not None:
-            try:
-                gallery = fetch_commons_gallery(
-                    destination.lat, destination.lon, session=self.session
+        for item in gallery:
+            if item["url"] == hero_url:
+                continue
+            images.append(
+                MediaImage(
+                    url=item["url"],
+                    source=item.get("source", "commons"),
+                    license=item.get("license", ""),
+                    attribution=item.get("attribution", ""),
                 )
-            except Exception:
-                gallery = []
-            media.images.extend(MediaImage(**item) for item in gallery)
-        return media
+            )
+
+        if len(images) < FALLBACK_MIN and destination.lat is not None and destination.lon is not None:
+            nearby = _safe(
+                fetch_commons_gallery,
+                destination.lat,
+                destination.lon,
+                session=self.session,
+                limit=self.gallery_limit,
+            ) or []
+            seen_urls = {image.url for image in images}
+            for item in filter_images(nearby, limit=self.gallery_limit):
+                if item["url"] in seen_urls:
+                    continue
+                seen_urls.add(item["url"])
+                images.append(
+                    MediaImage(
+                        url=item["url"],
+                        source=item.get("source", "commons"),
+                        license=item.get("license", ""),
+                        attribution=item.get("attribution", ""),
+                    )
+                )
+
+        return DestinationMedia(
+            destination_id=destination.id,
+            title=title,
+            page_url=page_url,
+            extract=extract,
+            source=self.name,
+            images=images,
+        )
 
 
 class CommonsMediaProvider:
@@ -64,7 +188,7 @@ class CommonsMediaProvider:
 
     name = "commons"
 
-    def __init__(self, session=None, limit: int = 4):
+    def __init__(self, session=None, limit: int = GALLERY_LIMIT):
         self.session = session
         self.limit = limit
 

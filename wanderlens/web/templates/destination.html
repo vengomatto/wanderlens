@@ -14,10 +14,14 @@
     <div class="dest-hero-text">
       <p class="crumb"><a href="/recommendations">← Recommendations</a></p>
       <h1>{{ detail.name }}</h1>
-      <p class="sub">
-        {{ detail.country }}
-        {% if detail.images and detail.images[0].license %} · {{ detail.images[0].license }}{% if detail.images[0].attribution %} · {{ detail.images[0].attribution }}{% endif %}{% endif %}
-      </p>
+      <p class="sub">{% if detail.images and detail.images[0].attribution %}Photo: {{ detail.images[0].attribution }}{% if detail.images[0].license %} · {{ detail.images[0].license }}{% endif %}{% endif %}</p>
+      <div class="dest-hero-meta">
+        {% if detail.country %}<span>{{ detail.country }}</span>{% endif %}
+        {% if detail.region_kind %}<span>{{ detail.region_kind }} area</span>{% endif %}
+        {% if detail.images %}<span>{{ detail.images | length }} photos</span>{% endif %}
+        {% if detail.pois %}<span>{{ detail.pois | length }} places to see</span>{% endif %}
+        {% if detail.climate %}<span>climate profile</span>{% endif %}
+      </div>
     </div>
     {% if detail.score is not none %}
     <div class="dest-hero-gauge">
@@ -33,7 +37,9 @@
   <div class="dest-grid">
     <section class="card">
       <h2>About</h2>
-      {% if detail.extract %}
+      {% if detail.understand %}
+      <p class="prose">{{ detail.understand }}</p>
+      {% elif detail.extract %}
       <p class="prose">{{ detail.extract }}</p>
       {% elif detail.short_description %}
       <p class="prose">{{ detail.short_description }}</p>
@@ -72,6 +78,126 @@
     </p>
   </section>
 
+  {% if detail.images %}
+  <section class="card" x-data="{ img: null }">
+    <h2>Photos</h2>
+    <div class="gallery">
+      {% for image in detail.images %}
+      <figure @click="img = '/destination-image/{{ detail.destination_id | urlencode }}/{{ image.position }}'">
+        <img src="/destination-image/{{ detail.destination_id | urlencode }}/{{ image.position }}" alt="" loading="lazy">
+        <figcaption>{% if image.license %}{{ image.license }}{% endif %}{% if image.attribution %}{% if image.license %} · {% endif %}{{ image.attribution }}{% endif %}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    <template x-if="img">
+      <div class="lightbox" @click="img = null">
+        <span class="lightbox-close">×</span>
+        <img :src="img" alt="">
+      </div>
+    </template>
+  </section>
+  {% endif %}
+
+  {% if detail.pois %}
+  <section class="card">
+    <h2>Points of interest</h2>
+    <ul class="poi-list">
+      {% for poi in detail.pois %}
+      <li><span class="poi-kind">{{ poi.kind }}</span>{{ poi.name }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.climate %}
+  <section class="card">
+    <h2>When to go</h2>
+    {% set months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'] %}
+    <div class="climate-chart">
+      {% for m in detail.climate %}
+      <div class="climate-col" title="{{ months[loop.index0] }}: {% if m.temp_c is not none %}{{ m.temp_c }}°C{% endif %}{% if m.precip_mm is not none %}, {{ m.precip_mm }} mm{% endif %}">
+        <div class="climate-bars">
+          {% if m.temp_c is not none %}{% set h = ((m.temp_c + 10) / 50 * 100) %}<span class="climate-temp" style="height: {{ [[h, 2] | max, 100] | min | round(0) | int }}%"></span>{% endif %}
+          {% if m.precip_mm is not none %}{% set r = ([m.precip_mm, 200] | min) / 2 %}<span class="climate-rain" style="height: {{ [[r, 2] | max, 100] | min | round(0) | int }}%"></span>{% endif %}
+        </div>
+        <div class="climate-label">{{ months[loop.index0] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="climate-legend">
+      <span class="k"><span class="swatch temp"></span>avg temperature</span>
+      <span class="k"><span class="swatch rain"></span>precipitation</span>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if detail.books %}
+  <section class="card">
+    <h2>Read before you go</h2>
+    <ul class="book-list">
+      {% for book in detail.books %}
+      <li>{% if book.url %}<a href="{{ book.url }}" target="_blank" rel="noopener">{{ book.title }}</a>{% else %}<strong>{{ book.title }}</strong>{% endif %}{% if book.author %}<span class="by">{{ book.author }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.films %}
+  <section class="card">
+    <h2>Films &amp; series set here</h2>
+    <ul class="link-list">
+      {% for film in detail.films %}
+      <li>{% if film.url %}<a href="{{ film.url }}" target="_blank" rel="noopener">{{ film.title }}</a>{% else %}{{ film.title }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.itineraries %}
+  <section class="card">
+    <h2>Suggested itineraries</h2>
+    {% for itinerary in detail.itineraries %}
+    <div class="itinerary">
+      <h3>{{ itinerary.title }}{% if itinerary.source == 'llm' %} <span class="ai-badge">AI-generated</span>{% endif %}</h3>
+      {% if itinerary.url %}<p class="muted"><a href="{{ itinerary.url }}" target="_blank" rel="noopener">Open on Wikivoyage →</a></p>{% endif %}
+      {% if itinerary.days %}
+      <ol>
+        {% for day in itinerary.days %}
+        <li><strong>{{ day['title'] or ('Day ' ~ loop.index) }}</strong>{% if day['summary'] %} — {{ day['summary'] }}{% endif %}
+          {% if day['items'] %}<ul>{% for item in day['items'] %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if detail.links %}
+  <section class="card">
+    <h2>Resources</h2>
+    <ul class="link-list">
+      {% for link in detail.links %}
+      <li><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.similar_destinations %}
+  <section class="card">
+    <h2>Similar destinations</h2>
+    <div class="similar">
+      {% for other in detail.similar_destinations %}
+      <a class="similar-trip" href="/destinations/{{ other.id | urlencode }}">
+        <span class="similar-label">{{ other.name }}{% if other.country %} · {{ other.country }}{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if similar %}
   <section class="card">
     <h2>You loved places like this</h2>
@@ -97,13 +223,6 @@
       {% if detail.media_source %}<dt>Media source</dt><dd>{{ detail.media_source }}</dd>{% endif %}
       {% if detail.region_kind %}<dt>Region shape</dt><dd>{{ detail.region_kind }}</dd>{% endif %}
     </dl>
-    {% if detail.images | length > 1 %}
-    <div class="dest-gallery">
-      {% for image in detail.images[1:] %}
-      <figure><img src="/destination-image/{{ detail.destination_id | urlencode }}/{{ image.position }}" alt="" loading="lazy"></figure>
-      {% endfor %}
-    </div>
-    {% endif %}
   </section>
 </article>
 <script>window.__dest = {{ map_payload | tojson }};</script>

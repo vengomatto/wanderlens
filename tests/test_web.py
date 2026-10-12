@@ -112,6 +112,26 @@ def _seed_media(config, conn):
         "VALUES ('wy:algarve', 'test', 3, ?)",
         (np.array([1.0, 0.0, 0.0], dtype=np.float32).tobytes(),),
     )
+    conn.execute(
+        "INSERT OR REPLACE INTO destination_guide "
+        "(destination_id, understand, links, books, pois, climate, films, fetched_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, 'now')",
+        (
+            "wy:algarve",
+            "Travel prose about the Algarve.",
+            json.dumps([{"label": "Wikivoyage", "url": "https://en.wikivoyage.org/wiki/Algarve"}]),
+            json.dumps([{"title": "Algarve Blues", "author": "A. Author", "url": ""}]),
+            json.dumps([{"name": "Benagil Cave", "kind": "see", "lat": 37.08, "lon": -8.42}]),
+            json.dumps([{"month": m, "temp_c": 10 + m, "precip_mm": 50} for m in range(1, 13)]),
+            json.dumps([{"title": "The Last Train to Lisbon", "url": ""}]),
+        ),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO destination_itineraries "
+        "(destination_id, position, title, summary, days, source, model, prompt_version, url, fetched_at) "
+        "VALUES ('wy:algarve', 0, 'Algarve in 4 days', '', ?, 'llm', 'test-model', 'itinerary-v1', '', 'now')",
+        (json.dumps([{"title": "Day 1", "summary": "Arrive", "items": ["Beach"]}]),),
+    )
 
 
 def _client(config):
@@ -253,7 +273,7 @@ def test_destination_page_renders(tmp_path):
     body = response.text
     assert "Algarve" in body
     assert "Why this is for you" in body
-    assert "southern Portugal" in body
+    assert "Travel prose about the Algarve" in body
     assert "wikipedia.org/wiki/Algarve" in body
     assert "CC BY-SA 4.0" in body
     assert 'id="world-map"' in body
@@ -264,6 +284,15 @@ def test_destination_page_renders(tmp_path):
     assert "/photos/u1-p0" in body
     assert "Valletta, Malta" in body  # closest trip
     assert "coastal" in body  # shared-attribute chip
+    assert "Travel prose about the Algarve" in body
+    assert "Read before you go" in body
+    assert "Algarve Blues" in body
+    assert "When to go" in body
+    assert "Films &amp; series set here" in body
+    assert "Suggested itineraries" in body
+    assert "AI-generated" in body
+    assert "Points of interest" in body
+    assert "Benagil Cave" in body
 
 
 def test_destination_page_without_media_degrades(tmp_path):

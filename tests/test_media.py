@@ -3,6 +3,7 @@ import json
 from wanderlens.catalog.fetch import (
     COMMONS_API,
     WIKIPEDIA_API,
+    WIKIVOYAGE_API,
     fetch_commons_gallery,
     fetch_wikipedia_media,
 )
@@ -62,15 +63,19 @@ COMMONS_JSON = {
     "query": {
         "pages": {
             "1": {
+                "title": "File:C1.jpg",
                 "imageinfo": [
                     {
                         "thumburl": "https://upload.test/c1.jpg",
+                        "width": 1600,
+                        "height": 1000,
+                        "mime": "image/jpeg",
                         "extmetadata": {
                             "LicenseShortName": {"value": "CC BY-SA 4.0"},
                             "Artist": {"value": "<a href='#'>Jane Doe</a>"},
                         },
                     }
-                ]
+                ],
             }
         }
     }
@@ -198,6 +203,76 @@ def test_chain_falls_through_on_error(tmp_path):
     # Commons provider needs a session returning gallery; without COMMONS route it misses.
     # The run must still complete and cache a (negative) row rather than raise.
     assert is_media_cached(conn, "wy:algarve")
+
+
+WIKIVOYAGE_PAGE = {
+    "query": {
+        "pages": {
+            "1": {
+                "title": "Algarve",
+                "fullurl": "https://en.wikivoyage.org/wiki/Algarve",
+                "extract": "TRAVEL PROSE about the Algarve.",
+                "pageprops": {},
+                "extlinks": [],
+                "links": [],
+            }
+        }
+    }
+}
+
+
+def test_media_prefers_travel_extract(tmp_path):
+    conn = connect(tmp_path / "wl.sqlite3")
+    init_db(conn)
+    session = FakeSession(
+        {
+            WIKIVOYAGE_API: FakeResponse(WIKIVOYAGE_PAGE),
+            WIKIPEDIA_API: FakeResponse(WIKI_JSON),
+            COMMONS_API: FakeResponse({"query": {"pages": {}}}),
+            NOMINATIM_SEARCH: FakeResponse([]),
+        }
+    )
+
+    fetch_media(conn, _destination(), tmp_path / "media", session=session)
+
+    row = conn.execute("SELECT extract FROM destination_media").fetchone()
+    assert row["extract"].startswith("TRAVEL PROSE")
+
+
+def test_gallery_reaches_ten(tmp_path):
+    conn = connect(tmp_path / "wl.sqlite3")
+    init_db(conn)
+    many = {
+        "query": {
+            "pages": {
+                str(i): {
+                    "title": f"File:G{i}.jpg",
+                    "imageinfo": [
+                        {
+                            "thumburl": f"https://upload.test/g{i}.jpg",
+                            "width": 1600,
+                            "height": 1000,
+                            "mime": "image/jpeg",
+                            "extmetadata": {},
+                        }
+                    ],
+                }
+                for i in range(12)
+            }
+        }
+    }
+    session = FakeSession(
+        {
+            WIKIPEDIA_API: FakeResponse(WIKI_JSON),
+            COMMONS_API: FakeResponse(many),
+            NOMINATIM_SEARCH: FakeResponse([]),
+            "upload.test": FakeResponse(content=b"x"),
+        }
+    )
+
+    fetch_media(conn, _destination(), tmp_path / "media", session=session)
+
+    assert conn.execute("SELECT COUNT(*) FROM destination_images").fetchone()[0] >= 10
 
 
 def test_image_downloads_send_user_agent(tmp_path):

@@ -4,6 +4,7 @@ from wanderlens.db import connect, init_db
 
 CORE_TABLES = {"users", "photos", "trips", "profile_entries", "recommendations"}
 MEDIA_TABLES = {"destination_media", "destination_images"}
+GUIDE_TABLES = {"destination_guide", "destination_itineraries"}
 SCOPED_TABLES = {
     "photos",
     "photo_embeddings",
@@ -56,6 +57,29 @@ def test_schema_creates_media_tables(tmp_path):
     assert "user_id" not in image_cols  # catalog-scoped, not user-scoped
 
 
+def test_schema_creates_guide_tables(tmp_path):
+    conn = connect(tmp_path / "wl.sqlite3")
+    init_db(conn)
+
+    names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert GUIDE_TABLES <= names
+
+    guide_cols = {r[1] for r in conn.execute("PRAGMA table_info(destination_guide)")}
+    assert {
+        "understand",
+        "links",
+        "books",
+        "pois",
+        "climate",
+        "films",
+        "fetched_at",
+    } <= guide_cols
+
+    itinerary_cols = {r[1] for r in conn.execute("PRAGMA table_info(destination_itineraries)")}
+    assert {"destination_id", "position", "title", "days", "source", "model", "url"} <= itinerary_cols
+    assert "user_id" not in itinerary_cols  # catalog-scoped
+
+
 def test_media_tables_added_to_legacy_db(tmp_path):
     db = tmp_path / "old.sqlite3"
     legacy = sqlite3.connect(db)
@@ -72,6 +96,7 @@ def test_media_tables_added_to_legacy_db(tmp_path):
 
     names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert MEDIA_TABLES <= names
+    assert GUIDE_TABLES <= names
 
 
 def test_migrate_adds_recommendation_display_columns(tmp_path):

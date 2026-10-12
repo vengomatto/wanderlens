@@ -129,6 +129,31 @@ CREATE TABLE IF NOT EXISTS destination_images (
     attribution     TEXT,
     PRIMARY KEY (destination_id, position)
 );
+
+CREATE TABLE IF NOT EXISTS destination_guide (
+    destination_id  TEXT PRIMARY KEY,
+    understand      TEXT,
+    links           TEXT,
+    books           TEXT,
+    pois            TEXT,
+    climate         TEXT,
+    films           TEXT,
+    fetched_at      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS destination_itineraries (
+    destination_id  TEXT    NOT NULL,
+    position        INTEGER NOT NULL,
+    title           TEXT,
+    summary         TEXT,
+    days            TEXT,
+    source          TEXT,
+    model           TEXT,
+    prompt_version  TEXT,
+    url             TEXT,
+    fetched_at      TEXT,
+    PRIMARY KEY (destination_id, position)
+);
 """
 
 
