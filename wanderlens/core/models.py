@@ -46,6 +46,20 @@ class Recommendation:
     explanation: str = ""
     embedding_score: Optional[float] = None
     attribute_score: Optional[float] = None
+    best_trip_id: Optional[int] = None
+    best_trip_label: str = ""
+    best_facet_similarity: Optional[float] = None
+    matched_attributes: dict[str, float] = field(default_factory=dict)
+    nearest_trip_km: Optional[float] = None
+
+
+@dataclass
+class Facet:
+    """A taste facet: one visual centroid per Trip, with the Trip's identity."""
+
+    trip_id: Optional[int]
+    label: str
+    vector: object
 
 
 @dataclass
@@ -54,3 +68,26 @@ class TasteProfile:
     geography: dict[str, float] = field(default_factory=dict)
     tags: dict[str, float] = field(default_factory=dict)
     embedding: Optional[object] = None
+
+
+@dataclass
+class MediaImage:
+    url: str
+    source: str = ""
+    license: str = ""
+    attribution: str = ""
+
+
+@dataclass
+class DestinationMedia:
+    destination_id: str
+    title: str = ""
+    page_url: str = ""
+    extract: str = ""
+    source: str = ""
+    license: str = ""
+    attribution: str = ""
+    images: list[MediaImage] = field(default_factory=list)
+    region_geojson: str = ""
+    region_kind: str = ""
+    region_radius_km: Optional[float] = None

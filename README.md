@@ -56,7 +56,7 @@ flowchart LR
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev,embeddings]'
+.venv/bin/pip install -e '.[dev,embeddings,web]'
 ```
 
 The CLIP ONNX model is downloaded automatically on first use into
@@ -86,6 +86,42 @@ already-downloaded files):
 .venv/bin/python -m wanderlens recommend --count 5
 .venv/bin/python -m wanderlens eval [--holdout Malta]
 ```
+
+The "why this is for you" is evidence-based: each Recommendation names the
+closest of your trips, the attributes it shares with your taste (weighted by how
+often they recur), and how new it is (distance from your nearest visit). Add
+`--explain-llm` (needs an API key) to have a pinned LLM rewrite those facts into
+prose; the text is cached per evidence, so reruns are reproducible and the
+deterministic explanation is always the fallback.
+
+### Web dashboard
+
+A local, read-only dashboard over the same data (FastAPI + Jinja + HTMX + a
+little Alpine.js, no build step):
+
+```bash
+.venv/bin/python -m wanderlens serve            # http://127.0.0.1:8000
+.venv/bin/python -m wanderlens serve --port 8765
+```
+
+It shows the Taste Profile, the ranked Recommendations (with their score
+components), each trip's own photos, and a map of visited and recommended
+places. It renders from the database only and never triggers ingestion or
+ranking — run `ingest` / `recommend` (or `ingest --tag`) first. Bound to
+localhost and single-user; front-end assets are vendored so it works offline.
+
+Recommendations now carry **pictures and a real destination page**. When you run
+`recommend`, each recommended Destination also fetches a Wikipedia image, an
+expanded description, and a region shape from free, keyless sources, cached under
+`data/media/` and in the database. From a card, `/destinations/{id}` opens a page
+with a hero image, the full description (with source and attribution), a **world
+locator and a regional map** highlighting the area — a precise boundary when one
+exists, an "approximate" circle otherwise — and your own most-similar trip photos
+("You loved places like this"). Use `recommend --no-media` to skip the network.
+
+Maps use **keyless** OpenStreetMap tiles by default (darkened in dark mode). To
+point them at another provider (including a keyed one), set `WANDERLENS_TILE_URL`
+and `WANDERLENS_TILE_ATTRIBUTION`.
 
 `--tag` sends a small sample of photos (~3 per trip) to the configured vision
 model. Without it, subject tags are skipped; geography and aesthetics are still

@@ -43,11 +43,26 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.5,
         help="weight of embedding similarity vs attribute match (0..1)",
     )
+    p_rec.add_argument(
+        "--no-media",
+        action="store_true",
+        help="skip fetching destination images, expanded descriptions, and region shapes",
+    )
+    p_rec.add_argument(
+        "--explain-llm",
+        action="store_true",
+        help="synthesise the 'why' with the LLM (needs an API key); cached",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
     p_eval.add_argument("--holdout", default=None, help="visited place to hold out")
     p_eval.set_defaults(func=cmd_eval)
+
+    p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
+    p_serve.add_argument("--host", default="127.0.0.1", help="bind host (localhost only by default)")
+    p_serve.add_argument("--port", type=int, default=8000, help="port to listen on")
+    p_serve.set_defaults(func=cmd_serve)
 
     return parser
 
@@ -88,7 +103,22 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     from wanderlens.pipeline.recommend import run_recommend
 
     config = load_config(args.config)
-    recs = run_recommend(config, user_name=args.user, count=args.count, alpha=args.alpha)
+    explainer = None
+    if args.explain_llm or config.explain_llm:
+        if config.api_key:
+            from wanderlens.models.ranker import HostedExplanationSynthesizer
+
+            explainer = HostedExplanationSynthesizer(config.api_key, config.llm_model)
+        else:
+            print("No API key configured; using the deterministic explanation.")
+    recs = run_recommend(
+        config,
+        user_name=args.user,
+        count=args.count,
+        alpha=args.alpha,
+        media=not args.no_media,
+        explainer=explainer,
+    )
     if not recs:
         print("No recommendations.")
         return 0
@@ -109,6 +139,18 @@ def cmd_eval(args: argparse.Namespace) -> int:
 
     config = load_config(args.config)
     print(run_eval(config, user_name=args.user, holdout=args.holdout))
+    return 0
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from wanderlens.web.app import create_app
+
+    config = load_config(args.config)
+    app = create_app(config, user_name=args.user)
+    print(f"Serving Wanderlens on http://{args.host}:{args.port} (Ctrl-C to stop)")
+    uvicorn.run(app, host=args.host, port=args.port)
     return 0
 
 

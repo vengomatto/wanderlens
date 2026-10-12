@@ -1,0 +1,7 @@
+Vendored front-end assets (no CDN at runtime, works offline)
+
+- htmx 2.0.4            vendor/htmx.min.js
+- Alpine.js 3.14.9      vendor/alpine.min.js
+- Leaflet 1.9.4         vendor/leaflet/leaflet.js, leaflet.css, images/
+
+Pinned deliberately; upgrade by replacing the file and updating this list.

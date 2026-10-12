@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, Protocol, Sequence
 
-from wanderlens.core.models import Destination, Photo
+from wanderlens.core.models import Destination, DestinationMedia, Photo
 
 
 class PhotoSource(Protocol):
@@ -42,4 +42,25 @@ class DescriptionProvider(Protocol):
     name: str
 
     def describe(self, name: str, country: str) -> "str | None":
+        ...
+
+
+class DestinationMediaProvider(Protocol):
+    """Supplies images and an expanded description for a Destination. Must return
+    ``None`` on a miss (never raise) so a provider chain can continue."""
+
+    name: str
+
+    def fetch(self, destination: Destination) -> "DestinationMedia | None":
+        ...
+
+
+class ExplanationSynthesizer(Protocol):
+    """Turns a Recommendation's evidence into a short explanation. Injectable and
+    pinned; a failure must fall back to the deterministic explanation."""
+
+    name: str
+    prompt_version: str
+
+    def synthesize(self, evidence: dict) -> str:
         ...

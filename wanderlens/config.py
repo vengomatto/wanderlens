@@ -23,6 +23,9 @@ class Config:
     llm_model: str = "meta-llama/llama-3.1-8b-instruct"
     exclude_radius_km: float = 60.0
     catalog_source: str = "wikivoyage"
+    tile_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    tile_attribution: str = "&copy; OpenStreetMap contributors"
+    explain_llm: bool = False
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -96,4 +99,12 @@ def load_config(
         catalog_source=values.get("catalog_source")
         or env.get("WANDERLENS_CATALOG_SOURCE")
         or "wikivoyage",
+        tile_url=values.get("tile_url")
+        or env.get("WANDERLENS_TILE_URL")
+        or "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        tile_attribution=values.get("tile_attribution")
+        or env.get("WANDERLENS_TILE_ATTRIBUTION")
+        or "&copy; OpenStreetMap contributors",
+        explain_llm=bool(values.get("explain_llm"))
+        or str(env.get("WANDERLENS_EXPLAIN_LLM", "")).lower() in {"1", "true", "yes", "on"},
     )

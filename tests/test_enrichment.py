@@ -194,6 +194,7 @@ def _config(tmp_path):
         vlm_provider="test",
         vlm_model="test",
         api_key=None,
+        catalog_source="geonames",
     )
 
 

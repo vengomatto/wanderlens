@@ -4,7 +4,18 @@ import json
 
 import requests
 
+from wanderlens.models.llm import HostedTextModel
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+_EXPLAIN_PROMPT_VERSION = "explain-v1"
+
+_EXPLAIN_SYSTEM = (
+    "You write a short, specific explanation (two sentences max) of why a travel "
+    "destination matches a user's taste. Use ONLY the provided facts; do not "
+    "invent places, attributes, or trips. Mention the closest visited trip and "
+    "the shared attributes. Plain text, no markdown, no preamble."
+)
 
 _SYSTEM = (
     "You re-rank travel destination suggestions for a user and explain each. "
@@ -55,3 +66,18 @@ class HostedRanker:
             rec.rank = rank
             rec.explanation = by_id.get(rec.destination.id, "")
         return ordered
+
+
+class HostedExplanationSynthesizer:
+    """Rewrites a Recommendation's evidence into prose. Pinned model + prompt."""
+
+    name = "llm"
+    prompt_version = _EXPLAIN_PROMPT_VERSION
+
+    def __init__(self, api_key: str | None, model: str, timeout: int = 60):
+        self.model = model
+        self.text = HostedTextModel(api_key, model, timeout)
+
+    def synthesize(self, evidence: dict) -> str:
+        prompt = _EXPLAIN_SYSTEM + "\n\nFacts:\n" + json.dumps(evidence, ensure_ascii=False)
+        return (self.text.complete(prompt) or "").strip()

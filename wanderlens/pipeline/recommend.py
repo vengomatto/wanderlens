@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
+from datetime import datetime, timezone
 from typing import Optional
 
 import numpy as np
 
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
-from wanderlens.core.models import Recommendation, TasteProfile
+from wanderlens.core.models import Facet, Recommendation, TasteProfile
 from wanderlens.core.recommend import (
     destination_text,
     explain,
@@ -31,30 +34,45 @@ def load_taste_embedding(conn: sqlite3.Connection, user_id: int) -> Optional[np.
 
 def load_taste_facets(
     conn: sqlite3.Connection, user_id: int, exclude_trip_id: Optional[int] = None
-) -> list[np.ndarray]:
-    """One normalized embedding centroid per trip (the taste facets)."""
+) -> list[Facet]:
+    """One normalized embedding centroid per trip (the taste facets), with the
+    trip's label so the closest visit can be named."""
     rows = conn.execute(
         """
-        SELECT tp.trip_id AS trip_id, pe.vector AS vector
+        SELECT tp.trip_id AS trip_id, tr.country AS country, tr.city AS city, pe.vector AS vector
         FROM trip_photos tp
         JOIN photo_embeddings pe
           ON pe.user_id = tp.user_id AND pe.photo_id = tp.photo_id
+        LEFT JOIN trips tr
+          ON tr.user_id = tp.user_id AND tr.id = tp.trip_id
         WHERE tp.user_id = ?
         """,
         (user_id,),
     ).fetchall()
     groups: dict[int, list[np.ndarray]] = {}
+    labels: dict[int, str] = {}
     for row in rows:
         if exclude_trip_id is not None and row["trip_id"] == exclude_trip_id:
             continue
         groups.setdefault(row["trip_id"], []).append(
             np.frombuffer(row["vector"], dtype=np.float32)
         )
-    facets: list[np.ndarray] = []
-    for vectors in groups.values():
+        if row["trip_id"] not in labels:
+            labels[row["trip_id"]] = (
+                ", ".join(p for p in (row["city"], row["country"]) if p)
+                or f"trip {row['trip_id']}"
+            )
+    facets: list[Facet] = []
+    for trip_id, vectors in groups.items():
         mean = np.mean(np.stack(vectors), axis=0).astype(np.float32)
         norm = np.linalg.norm(mean)
-        facets.append(mean / norm if norm else mean)
+        facets.append(
+            Facet(
+                trip_id=trip_id,
+                label=labels.get(trip_id, ""),
+                vector=mean / norm if norm else mean,
+            )
+        )
     return facets
 
 
@@ -162,6 +180,9 @@ def run_recommend(
     catalog: Optional[JsonCatalog] = None,
     ranker=None,
     alpha: float = 0.5,
+    media: bool = False,
+    media_fetcher=None,
+    explainer=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -202,23 +223,130 @@ def run_recommend(
         taste_tags=taste_attribute_weights(profile.tags),
         alpha=alpha,
         taste_facets=facets,
+        visited_centers=centers,
     )
 
+    visited_country = (
+        max(profile.geography, key=profile.geography.get) if profile.geography else None
+    )
     if ranker is not None:
         recommendations = ranker.rank(recommendations, profile)
     else:
-        visited_country = (
-            max(profile.geography, key=profile.geography.get) if profile.geography else None
-        )
         for rec in recommendations:
-            rec.explanation = explain(rec.destination, profile, visited_country)
+            rec.explanation = _explain(
+                conn, user_id, rec, profile, visited_country, explainer
+            )
 
     conn.execute("DELETE FROM recommendations WHERE user_id = ?", (user_id,))
     for rec in recommendations:
+        destination = rec.destination
         conn.execute(
-            "INSERT INTO recommendations (user_id, run_id, rank, destination_id, score, explanation) "
-            "VALUES (?, 1, ?, ?, ?, ?)",
-            (user_id, rec.rank, rec.destination.id, rec.score, rec.explanation),
+            "INSERT INTO recommendations "
+            "(user_id, run_id, rank, destination_id, score, explanation, "
+            " destination_name, destination_country, destination_lat, destination_lon, "
+            " destination_description, embedding_score, attribute_score, "
+            " matched_attributes, best_trip_id, best_trip_label, best_facet_similarity, "
+            " nearest_trip_km) "
+            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                rec.rank,
+                destination.id,
+                rec.score,
+                rec.explanation,
+                destination.name,
+                destination.country,
+                destination.lat,
+                destination.lon,
+                destination.description,
+                rec.embedding_score,
+                rec.attribute_score,
+                json.dumps(rec.matched_attributes),
+                rec.best_trip_id,
+                rec.best_trip_label,
+                rec.best_facet_similarity,
+                rec.nearest_trip_km,
+            ),
         )
     conn.commit()
+
+    if media:
+        fetcher = media_fetcher or _default_media_fetcher
+        try:
+            fetcher(conn, recommendations, config)
+        except Exception:
+            pass
     return recommendations
+
+
+def _evidence(rec: Recommendation, visited_country: Optional[str]) -> dict:
+    return {
+        "destination": rec.destination.name,
+        "country": rec.destination.country,
+        "closest_trip": rec.best_trip_label,
+        "similarity": round(rec.best_facet_similarity, 3)
+        if rec.best_facet_similarity is not None
+        else None,
+        "shared_attributes": sorted(
+            rec.matched_attributes, key=lambda key: -rec.matched_attributes[key]
+        ),
+        "new_for_you": rec.nearest_trip_km is not None,
+        "nearest_visit_km": round(rec.nearest_trip_km)
+        if rec.nearest_trip_km is not None
+        else None,
+        "visited_country": visited_country,
+        "embedding_score": round(rec.embedding_score, 3)
+        if rec.embedding_score is not None
+        else None,
+        "attribute_score": round(rec.attribute_score, 3)
+        if rec.attribute_score is not None
+        else None,
+    }
+
+
+def _evidence_hash(evidence: dict) -> str:
+    payload = json.dumps(evidence, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _explain(conn, user_id, rec, profile, visited_country, explainer) -> str:
+    fallback = explain(rec, profile, visited_country)
+    if explainer is None:
+        return fallback
+    evidence = _evidence(rec, visited_country)
+    digest = _evidence_hash(evidence)
+    try:
+        row = conn.execute(
+            "SELECT text FROM recommendation_explanations "
+            "WHERE user_id = ? AND destination_id = ? AND evidence_hash = ?",
+            (user_id, rec.destination.id, digest),
+        ).fetchone()
+        if row is not None:
+            return row["text"]
+        text = (explainer.synthesize(evidence) or "").strip()
+        if not text:
+            return fallback
+        conn.execute(
+            "INSERT OR REPLACE INTO recommendation_explanations "
+            "(user_id, destination_id, evidence_hash, model, prompt_version, text, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                rec.destination.id,
+                digest,
+                getattr(explainer, "model", ""),
+                getattr(explainer, "prompt_version", ""),
+                text,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+        return text
+    except Exception:
+        return fallback
+
+
+def _default_media_fetcher(conn, recommendations, config) -> int:
+    from wanderlens.catalog.media import fetch_media_for
+
+    return fetch_media_for(conn, recommendations, config.data_dir / "media")

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Recommendations · Wanderlens{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Recommendations</h1>
+  <p class="sub">New places ranked against your taste.</p>
+</section>
+
+{% if not recs %}
+<div class="empty">
+  <p>No recommendations yet.</p>
+  <p>Run <code>wanderlens recommend --count 5</code> and reload this page.</p>
+</div>
+{% else %}
+<div x-data="{ q: '' }">
+  <div class="toolbar">
+    <input type="search" placeholder="Filter by name or country…" x-model="q" aria-label="Filter">
+    <span class="muted">{{ recs | length }} places</span>
+  </div>
+  <ol class="rec-list">
+    {% for rec in recs %}
+    <li class="rec" data-search="{{ (rec.name ~ ' ' ~ rec.country) | lower }}" x-show="q === '' || $el.dataset.search.includes(q.toLowerCase())">
+      <a class="rec-hero" href="/destinations/{{ rec.destination_id | urlencode }}">
+        {% if rec.has_image %}
+        <img src="/destination-image/{{ rec.destination_id | urlencode }}/0" alt="{{ rec.name }}" loading="lazy">
+        {% else %}
+        <span class="rec-hero-placeholder">{{ rec.name[:1] | upper }}</span>
+        {% endif %}
+        <span class="rec-rank">{{ rec.rank }}</span>
+      </a>
+      <div class="rec-body">
+        <div class="rec-head">
+          <h2><a href="/destinations/{{ rec.destination_id | urlencode }}">{{ rec.name }}</a></h2>
+          {% if rec.country %}<span class="country">{{ rec.country }}</span>{% endif %}
+        </div>
+        {% if rec.description %}<p class="desc">{{ rec.description }}</p>{% endif %}
+        {% if rec.explanation %}<p class="why">{{ rec.explanation }}</p>{% endif %}
+        <div class="scores">
+          {% if rec.embedding_score is not none %}<span class="score-part">emb {{ "%.3f" | format(rec.embedding_score) }}</span>{% endif %}
+          {% if rec.attribute_score is not none %}<span class="score-part">attr {{ "%.3f" | format(rec.attribute_score) }}</span>{% endif %}
+          <a class="rec-more" href="/destinations/{{ rec.destination_id | urlencode }}">Explore →</a>
+        </div>
+      </div>
+      <div class="rec-gauge">
+        <svg class="gauge" viewBox="0 0 36 36" width="62" height="62" role="img" aria-label="score {{ '%.2f' | format(rec.score) }}">
+          <circle class="gauge-track" cx="18" cy="18" r="16" pathLength="100"/>
+          <circle class="gauge-value" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="{{ rec.score_pct }} 100"/>
+          <text class="gauge-text" x="18" y="21">{{ "%.2f" | format(rec.score) }}</text>
+        </svg>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+{% endblock %}

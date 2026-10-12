@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.trip.label }} · Wanderlens{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="crumb"><a href="/">← Taste profile</a></p>
+  <h1>{{ detail.trip.label }}</h1>
+  <p class="sub">
+    {{ detail.trip.start_at[:10] if detail.trip.start_at else 'no date' }}
+    {% if detail.trip.end_at and detail.trip.start_at and detail.trip.end_at[:10] != detail.trip.start_at[:10] %}
+      – {{ detail.trip.end_at[:10] }}
+    {% endif %}
+    · {{ detail.photos | length }} photos
+  </p>
+  {% if detail.attributes %}
+  <p class="chips">{% for a in detail.attributes %}<span>{{ a }}</span>{% endfor %}</p>
+  {% endif %}
+</section>
+
+{% if detail.photos %}
+<div class="gallery">
+  {% for photo in detail.photos %}
+  <figure>
+    <img src="/photos/{{ photo.id }}" alt="{{ photo.name }}" loading="lazy">
+  </figure>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty"><p>No photos recorded for this trip.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Taste profile · Wanderlens{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Taste profile</h1>
+  <p class="sub">Learned from {{ view.user_name }}'s photo archive.</p>
+</section>
+
+{% if not view.has_profile %}
+<div class="empty">
+  <p>No taste profile yet.</p>
+  <p>Run <code>wanderlens ingest</code> to read your photos and build it.</p>
+</div>
+{% else %}
+<div class="stats">
+  <div class="stat"><span class="n">{{ view.trips | length }}</span><span class="l">trips</span></div>
+  <div class="stat"><span class="n">{{ view.embedded_photos }}</span><span class="l">photos embedded</span></div>
+  <div class="stat"><span class="n">{{ view.geography | length }}</span><span class="l">countries visited</span></div>
+</div>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Visited geography</h2>
+    {% if view.geography %}
+    <ul class="bars">
+      {% for key, value in view.geography %}
+      <li><span class="k">{{ key }}</span><span class="bar"><i style="width: {{ (value * 100) | round(1) }}%"></i></span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">None yet.</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Subjects &amp; activities</h2>
+    {% if view.subjects %}
+    <ul class="bars">
+      {% for key, value in view.subjects %}
+      <li><span class="k">{{ key }}</span><span class="bar"><i style="width: {{ (value * 100) | round(1) }}%"></i></span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">None yet — run ingest with <code>--tag</code>.</p>{% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Trips</h2>
+  <div class="trip-grid">
+    {% for trip in view.trips %}
+    <a class="trip" href="/trips/{{ trip.id }}">
+      <div class="trip-thumbs">
+        {% for pid in trip.photo_ids[:3] %}
+        <img src="/photos/{{ pid }}" alt="" loading="lazy">
+        {% else %}
+        <div class="thumb-empty">no photos</div>
+        {% endfor %}
+      </div>
+      <h3>{{ trip.label }}</h3>
+      <p class="muted">{{ trip.start_at[:10] if trip.start_at else 'no date' }} · {{ trip.photo_count }} photos</p>
+      {% if trip.attributes %}<p class="chips">{% for a in trip.attributes[:4] %}<span>{{ a }}</span>{% endfor %}</p>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

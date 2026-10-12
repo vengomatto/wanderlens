@@ -16,7 +16,19 @@ def test_parser_has_all_commands():
     parser = build_parser()
     actions = [a for a in parser._actions if getattr(a, "choices", None)]
     commands = set(actions[0].choices)
-    assert {"ingest", "profile", "recommend", "eval"} <= commands
+    assert {"ingest", "profile", "recommend", "eval", "serve"} <= commands
+
+
+def test_recommend_no_media_flag_parses():
+    parser = build_parser()
+    args = parser.parse_args(["recommend", "--no-media"])
+    assert args.no_media is True
+
+
+def test_recommend_media_defaults_on():
+    parser = build_parser()
+    args = parser.parse_args(["recommend"])
+    assert args.no_media is False
 
 
 def test_module_entrypoint_help():
@@ -37,6 +49,7 @@ def test_module_entrypoint_help():
         ["profile", "show", "--help"],
         ["recommend", "--help"],
         ["eval", "--help"],
+        ["serve", "--help"],
     ],
 )
 def test_subcommand_help(argv):

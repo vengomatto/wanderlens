@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 embeddings = ["onnxruntime", "tokenizers"]
+web = ["fastapi", "uvicorn", "jinja2"]
 dev = ["pytest", "piexif"]
 
 [project.scripts]

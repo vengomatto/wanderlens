@@ -20,3 +20,10 @@ def test_config_defaults_without_file():
     assert cfg.photos_dir.name == "photos"
     assert cfg.db_path.name == "wanderlens.sqlite3"
     assert cfg.api_key == "or-key"
+    assert "tile.openstreetmap.org" in cfg.tile_url
+
+
+def test_tile_url_is_configurable():
+    cfg = load_config(None, env={"WANDERLENS_TILE_URL": "https://tiles.example/{z}/{x}/{y}.png"})
+
+    assert cfg.tile_url == "https://tiles.example/{z}/{x}/{y}.png"

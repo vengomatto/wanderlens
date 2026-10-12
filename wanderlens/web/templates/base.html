@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Wanderlens{% endblock %}</title>
+  <meta name="htmx-config" content='{"globalViewTransitions": true}'>
+  <script>window.__tiles = {{ (tiles or {}) | tojson }};</script>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="dot"></span>Wanderlens</a>
+    <nav hx-boost="true">
+      <a href="/" class="{{ 'active' if active == 'profile' else '' }}">Taste profile</a>
+      <a href="/recommendations" class="{{ 'active' if active == 'recommendations' else '' }}">Recommendations</a>
+      <a href="/map" class="{{ 'active' if active == 'map' else '' }}">Map</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="foot">Wanderlens · local, read-only dashboard · run <code>wanderlens recommend</code> to refresh suggestions</footer>
+</body>
+</html>

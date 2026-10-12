@@ -80,7 +80,54 @@ CREATE TABLE IF NOT EXISTS recommendations (
     destination_id  TEXT    NOT NULL,
     score           REAL    NOT NULL,
     explanation     TEXT,
+    destination_name        TEXT,
+    destination_country     TEXT,
+    destination_lat         REAL,
+    destination_lon         REAL,
+    destination_description TEXT,
+    embedding_score         REAL,
+    attribute_score         REAL,
+    matched_attributes      TEXT,
+    best_trip_id            INTEGER,
+    best_trip_label         TEXT,
+    best_facet_similarity   REAL,
+    nearest_trip_km         REAL,
     PRIMARY KEY (user_id, run_id, rank)
+);
+
+CREATE TABLE IF NOT EXISTS recommendation_explanations (
+    user_id         INTEGER NOT NULL,
+    destination_id  TEXT    NOT NULL,
+    evidence_hash   TEXT    NOT NULL,
+    model           TEXT,
+    prompt_version  TEXT,
+    text            TEXT    NOT NULL,
+    created_at      TEXT,
+    PRIMARY KEY (user_id, destination_id, evidence_hash)
+);
+
+CREATE TABLE IF NOT EXISTS destination_media (
+    destination_id   TEXT PRIMARY KEY,
+    title            TEXT,
+    page_url         TEXT,
+    extract          TEXT,
+    source           TEXT,
+    license          TEXT,
+    attribution      TEXT,
+    region_geojson   TEXT,
+    region_kind      TEXT,
+    region_radius_km REAL,
+    fetched_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS destination_images (
+    destination_id  TEXT    NOT NULL,
+    position        INTEGER NOT NULL,
+    filename        TEXT    NOT NULL,
+    source          TEXT,
+    license         TEXT,
+    attribution     TEXT,
+    PRIMARY KEY (destination_id, position)
 );
 """
 
@@ -106,3 +153,21 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE trips ADD COLUMN lat REAL")
     if "lon" not in columns:
         conn.execute("ALTER TABLE trips ADD COLUMN lon REAL")
+
+    rec_columns = {row[1] for row in conn.execute("PRAGMA table_info(recommendations)")}
+    for column, declaration in (
+        ("destination_name", "TEXT"),
+        ("destination_country", "TEXT"),
+        ("destination_lat", "REAL"),
+        ("destination_lon", "REAL"),
+        ("destination_description", "TEXT"),
+        ("embedding_score", "REAL"),
+        ("attribute_score", "REAL"),
+        ("matched_attributes", "TEXT"),
+        ("best_trip_id", "INTEGER"),
+        ("best_trip_label", "TEXT"),
+        ("best_facet_similarity", "REAL"),
+        ("nearest_trip_km", "REAL"),
+    ):
+        if column not in rec_columns:
+            conn.execute(f"ALTER TABLE recommendations ADD COLUMN {column} {declaration}")

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Map · Wanderlens{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<script src="/static/vendor/leaflet/leaflet.js" defer></script>
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Map</h1>
+  <p class="sub">Where you've been — and where you might go next.</p>
+</section>
+
+{% if points %}
+<div class="legend">
+  <span class="key trip"></span> visited
+  <span class="key dest"></span> recommended
+</div>
+<div id="map" class="map"></div>
+<script>window.__points = {{ points_payload | tojson }};</script>
+<script src="/static/map.js" defer></script>
+{% else %}
+<div class="empty">
+  <p>Nothing to plot yet.</p>
+  <p>Run <code>wanderlens ingest</code> and <code>wanderlens recommend</code> first.</p>
+</div>
+{% endif %}
+{% endblock %}

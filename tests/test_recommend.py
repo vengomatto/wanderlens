@@ -106,6 +106,62 @@ def test_best_matching_facet_scores_destination():
     assert recs[0].embedding_score == 1.0  # matches the second facet, not the first
 
 
+def test_rank_tracks_closest_trip_and_attributes():
+    from wanderlens.core.models import Facet
+
+    facets = [
+        Facet(trip_id=1, label="Puglia, Italy", vector=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+        Facet(trip_id=2, label="Malta", vector=np.array([0.0, 1.0, 0.0], dtype=np.float32)),
+    ]
+
+    def embed_text(text):
+        return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    destination = Destination(
+        id="d", name="Coastland", lat=1.0, lon=1.0, country="Greece", description="a coastal town"
+    )
+    tags = taste_attribute_weights({"coastal": 1.0})
+
+    rec = rank_destinations(
+        None,
+        [destination],
+        embed_text,
+        taste_tags=tags,
+        taste_facets=facets,
+        visited_centers=[(0.0, 0.0)],
+    )[0]
+
+    assert rec.best_trip_id == 1
+    assert rec.best_trip_label == "Puglia, Italy"
+    assert rec.best_facet_similarity == 1.0
+    assert rec.matched_attributes.get("coastal") == 1.0
+    assert rec.nearest_trip_km is not None
+
+
+def test_ranking_order_unchanged_by_facet_identity():
+    from wanderlens.core.models import Facet
+
+    def embed_text(text):
+        vector = np.zeros(3, dtype=np.float32)
+        lowered = text.lower()
+        if "coast" in lowered:
+            vector[0] = 1.0
+        if "mountain" in lowered:
+            vector[1] = 1.0
+        return vector / np.linalg.norm(vector) if vector.sum() else np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    vectors = [
+        Facet(trip_id=0, label="A", vector=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+        Facet(trip_id=1, label="B", vector=np.array([0.0, 1.0, 0.0], dtype=np.float32)),
+    ]
+    bare = [f.vector for f in vectors]
+
+    with_facets = [r.destination.id for r in rank_destinations(None, DESTINATIONS, embed_text, taste_facets=vectors)]
+    with_bare = [r.destination.id for r in rank_destinations(None, DESTINATIONS, embed_text, taste_facets=bare)]
+
+    assert with_facets == with_bare
+
+
 def test_taste_attribute_weights_canonicalizes_and_normalizes():
     weights = taste_attribute_weights({"turquoise water": 0.5, "coastal city": 0.5})
     assert {"water", "coastal", "city"} <= set(weights)
@@ -158,6 +214,9 @@ def _seed(tmp_path):
             "INSERT INTO photo_embeddings (user_id, photo_id, dim, vector) VALUES (1, ?, 3, ?)",
             (f"p{i}", np.array([1.0, 0.0, 0.0], dtype=np.float32).tobytes()),
         )
+        conn.execute(
+            "INSERT INTO trip_photos (user_id, trip_id, photo_id) VALUES (1, 0, ?)", (f"p{i}",)
+        )
     conn.execute(
         "INSERT INTO profile_entries (user_id, factor, key, value) VALUES (1, 'geography', 'Malta', 1.0)"
     )
@@ -189,6 +248,16 @@ def test_run_recommend_end_to_end(tmp_path):
     stored = conn.execute("SELECT COUNT(*) FROM recommendations").fetchone()[0]
     assert stored == len(recs)
 
+    row = conn.execute(
+        "SELECT destination_name, destination_country, destination_lat, "
+        "embedding_score, attribute_score FROM recommendations WHERE rank = 1"
+    ).fetchone()
+    assert row[0] == "Coastland"
+    assert row[1] == "Croatia"
+    assert row[2] == 44.0
+    assert row[3] is not None
+    assert row[4] is not None
+
 
 def test_destination_embeddings_are_cached(tmp_path):
     config = _seed(tmp_path)
@@ -211,3 +280,121 @@ def test_run_recommend_without_embeddings_returns_empty(tmp_path):
     conn.commit()
 
     assert run_recommend(config, embedder=FakeEmbedder(), catalog=JsonCatalog(DESTINATIONS)) == []
+
+
+def test_run_recommend_fetches_and_caches_media(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+    seen = {}
+
+    def fake_fetcher(conn, recommendations, cfg):
+        seen["count"] = len(recommendations)
+        for rec in recommendations:
+            conn.execute(
+                "INSERT OR REPLACE INTO destination_media (destination_id, title, fetched_at) "
+                "VALUES (?, ?, ?)",
+                (rec.destination.id, "T", "now"),
+            )
+        conn.commit()
+        return len(recommendations)
+
+    recs = run_recommend(
+        config,
+        count=5,
+        embedder=FakeEmbedder(),
+        catalog=catalog,
+        media=True,
+        media_fetcher=fake_fetcher,
+    )
+
+    assert recs
+    assert seen["count"] == len(recs)
+    conn = connect(config.db_path)
+    assert conn.execute("SELECT COUNT(*) FROM destination_media").fetchone()[0] == len(recs)
+
+
+def test_run_recommend_survives_media_error(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    def boom(conn, recommendations, cfg):
+        raise RuntimeError("media fetch failed")
+
+    recs = run_recommend(
+        config, embedder=FakeEmbedder(), catalog=catalog, media=True, media_fetcher=boom
+    )
+
+    assert recs
+
+
+def test_run_recommend_persists_evidence(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    run_recommend(config, count=5, embedder=FakeEmbedder(), catalog=catalog)
+
+    row = sqlite3.connect(config.db_path).execute(
+        "SELECT best_trip_label, matched_attributes, nearest_trip_km "
+        "FROM recommendations WHERE rank = 1"
+    ).fetchone()
+    assert row[0] == "Valletta, Malta"
+    assert "coastal" in (row[1] or "")
+    assert row[2] is not None
+
+
+def test_run_recommend_explains_with_evidence(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    recs = run_recommend(config, embedder=FakeEmbedder(), catalog=catalog)
+
+    assert "Valletta, Malta" in recs[0].explanation
+    assert "coastal" in recs[0].explanation
+
+
+class CountingExplainer:
+    name = "stub"
+    prompt_version = "v1"
+
+    def __init__(self):
+        self.calls = 0
+
+    def synthesize(self, evidence):
+        self.calls += 1
+        return f"LLM why for {evidence['destination']}"
+
+
+class RaisingExplainer:
+    name = "boom"
+    prompt_version = "v1"
+
+    def synthesize(self, evidence):
+        raise RuntimeError("no")
+
+
+def test_explanation_synthesis_is_cached(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+    explainer = CountingExplainer()
+
+    run_recommend(config, embedder=FakeEmbedder(), catalog=catalog, explainer=explainer)
+    first = explainer.calls
+    assert first >= 1
+
+    recs = run_recommend(
+        config, embedder=FakeEmbedder(), catalog=catalog, explainer=explainer
+    )
+    assert explainer.calls == first, "cached explanation should be reused"
+    assert recs[0].explanation.startswith("LLM why")
+
+
+def test_synthesis_failure_falls_back(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    recs = run_recommend(
+        config, embedder=FakeEmbedder(), catalog=catalog, explainer=RaisingExplainer()
+    )
+
+    assert recs
+    assert recs[0].explanation

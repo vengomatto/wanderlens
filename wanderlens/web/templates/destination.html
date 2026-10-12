@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.name }} · Wanderlens{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<script src="/static/vendor/leaflet/leaflet.js" defer></script>
+{% endblock %}
+{% block content %}
+<article class="dest">
+  <header class="dest-hero{% if not detail.images %} dest-hero-empty{% endif %}">
+    {% if detail.images %}
+    <img src="/destination-image/{{ detail.destination_id | urlencode }}/{{ detail.images[0].position }}" alt="{{ detail.name }}" loading="lazy">
+    {% endif %}
+    <span class="dest-hero-scrim"></span>
+    <div class="dest-hero-text">
+      <p class="crumb"><a href="/recommendations">← Recommendations</a></p>
+      <h1>{{ detail.name }}</h1>
+      <p class="sub">
+        {{ detail.country }}
+        {% if detail.images and detail.images[0].license %} · {{ detail.images[0].license }}{% if detail.images[0].attribution %} · {{ detail.images[0].attribution }}{% endif %}{% endif %}
+      </p>
+    </div>
+    {% if detail.score is not none %}
+    <div class="dest-hero-gauge">
+      <svg class="gauge gauge-lg" viewBox="0 0 36 36" width="76" height="76" role="img" aria-label="score {{ '%.2f' | format(detail.score) }}">
+        <circle class="gauge-track" cx="18" cy="18" r="16" pathLength="100"/>
+        <circle class="gauge-value" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="{{ detail.score_pct }} 100"/>
+        <text class="gauge-text" x="18" y="21">{{ "%.2f" | format(detail.score) }}</text>
+      </svg>
+    </div>
+    {% endif %}
+  </header>
+
+  <div class="dest-grid">
+    <section class="card">
+      <h2>About</h2>
+      {% if detail.extract %}
+      <p class="prose">{{ detail.extract }}</p>
+      {% elif detail.short_description %}
+      <p class="prose">{{ detail.short_description }}</p>
+      {% else %}
+      <p class="muted">No description available yet. Run <code>wanderlens recommend</code> with network access.</p>
+      {% endif %}
+      {% if detail.page_url %}
+      <p class="source">Source: <a href="{{ detail.page_url }}" target="_blank" rel="noopener">Wikipedia</a>{% if detail.media_license %} · {{ detail.media_license }}{% endif %}</p>
+      {% endif %}
+    </section>
+    <section class="card why-card">
+      <h2>Why this is for you</h2>
+      {% if detail.explanation %}<p>{{ detail.explanation }}</p>{% endif %}
+      {% if detail.matched_attributes %}
+      <p class="chips">{% for name, weight in detail.matched_attributes %}<span>{{ name }}</span>{% endfor %}</p>
+      {% endif %}
+      {% if detail.best_trip_label %}
+      <p class="muted closest">Closest to your <strong>{{ detail.best_trip_label }}</strong> trip{% if detail.nearest_trip_km is not none %} · {{ detail.nearest_trip_km | round(0) | int }} km from your nearest visit{% endif %}.</p>
+      {% endif %}
+      <div class="scores">
+        {% if detail.embedding_score is not none %}<span class="score-part">emb {{ "%.3f" | format(detail.embedding_score) }}</span>{% endif %}
+        {% if detail.attribute_score is not none %}<span class="score-part">attr {{ "%.3f" | format(detail.attribute_score) }}</span>{% endif %}
+      </div>
+    </section>
+  </div>
+
+  <section class="card maps-card">
+    <h2>Where it is</h2>
+    <div class="maps">
+      <div class="map map-world" id="world-map"></div>
+      <div class="map map-region" id="region-map"></div>
+    </div>
+    <p class="muted legend-note">
+      {% if detail.region_kind == 'approximate' %}Highlighted area is <strong>approximate</strong>.{% elif detail.region_kind == 'precise' %}Highlighted area is the destination's boundary.{% endif %}
+      Also on the <a href="/map">overview map</a>.
+    </p>
+  </section>
+
+  {% if similar %}
+  <section class="card">
+    <h2>You loved places like this</h2>
+    <p class="muted">From your own trips with a similar taste.</p>
+    <div class="similar">
+      {% for s in similar %}
+      <a class="similar-trip" href="/trips/{{ s.trip.id }}">
+        <span class="similar-thumbs">
+          {% for pid in s.photo_ids %}<img src="/photos/{{ pid }}" alt="" loading="lazy">{% endfor %}
+        </span>
+        <span class="similar-label">{{ s.trip.label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card facts">
+    <h2>Facts</h2>
+    <dl>
+      <dt>Destination id</dt><dd>{{ detail.destination_id }}</dd>
+      {% if detail.lat is not none %}<dt>Coordinates</dt><dd>{{ "%.3f" | format(detail.lat) }}, {{ "%.3f" | format(detail.lon) }}</dd>{% endif %}
+      {% if detail.media_source %}<dt>Media source</dt><dd>{{ detail.media_source }}</dd>{% endif %}
+      {% if detail.region_kind %}<dt>Region shape</dt><dd>{{ detail.region_kind }}</dd>{% endif %}
+    </dl>
+    {% if detail.images | length > 1 %}
+    <div class="dest-gallery">
+      {% for image in detail.images[1:] %}
+      <figure><img src="/destination-image/{{ detail.destination_id | urlencode }}/{{ image.position }}" alt="" loading="lazy"></figure>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+</article>
+<script>window.__dest = {{ map_payload | tojson }};</script>
+<script src="/static/destination.js" defer></script>
+{% endblock %}

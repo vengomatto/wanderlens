@@ -9,6 +9,7 @@ from wanderlens.catalog.destinations import JsonCatalog, normalize_record
 WIKIDATA_ENDPOINT = "https://query.wikidata.org/sparql"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
 
 
@@ -42,6 +43,114 @@ def fetch_wikipedia_summary(
     page = next(iter(pages.values()))
     extract = " ".join(page.get("extract", "").split())
     return extract[:300]
+
+
+def _strip_html(value: str) -> str:
+    import re
+
+    return " ".join(re.sub(r"<[^>]+>", " ", value or "").split())
+
+
+def _meta(metadata: dict, key: str) -> str:
+    entry = metadata.get(key) or {}
+    return str(entry.get("value", "")) if isinstance(entry, dict) else ""
+
+
+def fetch_wikipedia_media(
+    name: str, country: str = "", session=None, timeout: int = 30, max_chars: int = 1500
+) -> Optional[dict]:
+    """Hero image + expanded extract + source link for a place, from Wikipedia."""
+    import requests
+
+    session = session or requests
+    response = session.get(
+        WIKIPEDIA_API,
+        params={
+            "action": "query",
+            "format": "json",
+            "generator": "search",
+            "gsrsearch": f"{name} {country}".strip(),
+            "gsrlimit": 1,
+            "prop": "extracts|pageimages|info",
+            "explaintext": 1,
+            "exlimit": 1,
+            "piprop": "thumbnail",
+            "pithumbsize": 1280,
+            "inprop": "url",
+            "redirects": 1,
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    pages = response.json().get("query", {}).get("pages", {})
+    if not pages:
+        return None
+    page = next(iter(pages.values()))
+    extract = " ".join(page.get("extract", "").split())
+    if len(extract) > max_chars:
+        extract = extract[:max_chars].rsplit(" ", 1)[0]
+    thumbnail = (page.get("thumbnail") or {}).get("source", "")
+    if not extract and not thumbnail:
+        return None
+    return {
+        "title": page.get("title", ""),
+        "page_url": page.get("fullurl", ""),
+        "extract": extract,
+        "image_url": thumbnail,
+        "image_license": "",
+        "image_attribution": "Wikipedia",
+    }
+
+
+def fetch_commons_gallery(
+    lat: float,
+    lon: float,
+    session=None,
+    limit: int = 4,
+    radius: int = 10000,
+    timeout: int = 30,
+    thumb_width: int = 1280,
+) -> list[dict]:
+    """A small gallery of Commons images geotagged near the coordinates."""
+    import requests
+
+    session = session or requests
+    response = session.get(
+        COMMONS_API,
+        params={
+            "action": "query",
+            "format": "json",
+            "generator": "geosearch",
+            "ggscoord": f"{lat}|{lon}",
+            "ggsradius": radius,
+            "ggslimit": limit,
+            "ggsnamespace": 6,
+            "prop": "imageinfo",
+            "iiprop": "url|extmetadata",
+            "iiurlwidth": thumb_width,
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    pages = response.json().get("query", {}).get("pages", {})
+    images: list[dict] = []
+    for page in pages.values():
+        info = (page.get("imageinfo") or [{}])[0]
+        url = info.get("thumburl") or info.get("url")
+        if not url:
+            continue
+        metadata = info.get("extmetadata") or {}
+        images.append(
+            {
+                "url": url,
+                "source": "commons",
+                "license": _strip_html(_meta(metadata, "LicenseShortName")),
+                "attribution": _strip_html(_meta(metadata, "Artist")),
+            }
+        )
+    return images
 
 
 def fetch_wikidata_description(name: str, session=None, timeout: int = 30) -> str:
