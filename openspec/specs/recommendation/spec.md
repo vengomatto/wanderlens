@@ -187,3 +187,53 @@ evidence, and MUST NOT fail the run on error.
 
 - **WHEN** the same Destination and evidence were synthesised before
 - **THEN** the cached explanation is reused rather than regenerated
+
+### Requirement: Ranking consumes feedback
+
+The system SHALL incorporate the user's recorded feedback into ranking, applying
+a deterministic bias per Destination and leaving ranking unchanged when no
+feedback exists.
+
+#### Scenario: Feedback applied
+- **WHEN** a Destination has recorded feedback and rankings are produced
+- **THEN** its score reflects the feedback bias
+
+#### Scenario: No feedback, no change
+- **WHEN** no feedback exists
+- **THEN** the ranking matches the feedback-free ranking
+
+### Requirement: Diversify the ranked list
+
+The system SHALL select the returned Recommendations so they are both high-scoring
+and mutually dissimilar, rather than the independently highest-scoring items,
+using a tunable diversity weight.
+
+#### Scenario: Near-duplicates avoided
+
+- **WHEN** several top-scoring candidate Destinations are very similar to each other
+- **THEN** the list includes dissimilar alternatives instead of only the near-duplicates
+
+#### Scenario: Deterministic
+
+- **WHEN** the same inputs are ranked twice with the same diversity weight
+- **THEN** the selected list is identical
+
+### Requirement: Novelty preference biases selection
+
+The system SHALL accept a novelty preference — familiar, balanced, or uncommon —
+and bias selection toward well-known or less-known Destinations accordingly.
+
+#### Scenario: Familiar preference
+
+- **WHEN** the preference is familiar and a popular destination and an obscure one are otherwise comparable
+- **THEN** the popular destination is preferred
+
+#### Scenario: Uncommon preference
+
+- **WHEN** the preference is uncommon and a popular destination and an obscure one are otherwise comparable
+- **THEN** the obscure destination is preferred
+
+#### Scenario: Balanced preference
+
+- **WHEN** the preference is balanced
+- **THEN** selection does not favour popularity either way
