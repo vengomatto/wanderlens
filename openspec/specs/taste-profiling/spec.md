@@ -7,8 +7,8 @@ resolving visited places, and deriving aesthetic and subject signals.
 ## Requirements
 
 ### Requirement: Group photos into trips
-The system SHALL group Photos into trips using capture-time gaps and GPS
-proximity.
+The system SHALL group Photos into trips using configurable capture-time gap and
+GPS-proximity thresholds, so split boundaries can be tuned per archive.
 
 #### Scenario: Same trip
 - **WHEN** photos are captured within a short time window at nearby coordinates
@@ -17,6 +17,10 @@ proximity.
 #### Scenario: Separate trips
 - **WHEN** a capture-time gap or a large spatial jump separates photo groups
 - **THEN** the groups form separate trips
+
+#### Scenario: Configurable boundaries
+- **WHEN** the capture-time gap or spatial-jump thresholds are configured
+- **THEN** trips are split according to those configured values
 
 ### Requirement: Resolve visited places
 The system SHALL resolve each trip to a visited country and city using offline
@@ -91,6 +95,19 @@ profile.
 #### Scenario: Facets preserved
 - **WHEN** the profile is built from several trips
 - **THEN** each trip contributes its own facet to the profile
+
+### Requirement: Robust taste facets
+The system SHALL require a minimum number of Photos for a trip to contribute a
+full-weight taste facet; a trip below the threshold contributes a weighted-down
+or omitted facet so a one-photo trip does not act as a robust centroid.
+
+#### Scenario: Well-supported trip facet
+- **WHEN** a trip has at least the minimum number of Photos
+- **THEN** it contributes a full-weight facet
+
+#### Scenario: Thin trip facet
+- **WHEN** a trip has fewer Photos than the minimum
+- **THEN** its facet is weighted down or omitted rather than treated as a robust centroid
 
 ### Requirement: Trips record their location
 The system SHALL record a location (centroid) for each trip, derived from its
