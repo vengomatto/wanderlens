@@ -154,6 +154,17 @@
   </section>
   {% endif %}
 
+  {% if detail.best_months or detail.climate_match %}
+  {% set months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'] %}
+  <section class="card climate-fit-card">
+    <h2>Climate fit</h2>
+    <p class="climate-fit">
+      {% if detail.best_months %}<strong>Best months for you:</strong> {% for m in detail.best_months %}{{ months[m - 1] }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+      {% if detail.climate_match %} · climate match {{ '%.2f' | format(detail.climate_match) }}{% endif %}
+    </p>
+  </section>
+  {% endif %}
+
   {% if detail.books %}
   <section class="card">
     <h2>Read before you go</h2>

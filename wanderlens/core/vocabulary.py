@@ -47,6 +47,18 @@ VOCABULARY: dict[str, tuple[str, ...]] = {
     "sunset": ("sunset", "sunrise", "golden hour"),
     "desert": ("desert", "dune"),
     "countryside": ("countryside", "rural", "farm", "farmland"),
+    "weather": (
+        "clear sky",
+        "blue sky",
+        "sunny",
+        "cloudy",
+        "overcast",
+        "mist",
+        "fog",
+        "rain",
+        "storm",
+        "dramatic sky",
+    ),
 }
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")

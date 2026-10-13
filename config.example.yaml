@@ -19,5 +19,8 @@ vlm_model: openai/gpt-4o-mini
 # build_case: true
 # refresh_media: false
 # embedder: clip
+# climate: true                          # derive a trip climate profile + best months
+# climate_weight: 0.0                    # bias ranking by climate match (0 = off)
+# season: summer                         # prefer destinations best in this season
 # exclude_radius_km: 60
 # catalog_source: wikivoyage

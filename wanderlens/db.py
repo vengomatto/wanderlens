@@ -171,6 +171,24 @@ CREATE TABLE IF NOT EXISTS feedback (
     PRIMARY KEY (user_id, destination_id)
 );
 
+CREATE TABLE IF NOT EXISTS trip_weather (
+    user_id     INTEGER NOT NULL,
+    trip_id     INTEGER NOT NULL,
+    temp_c      REAL,
+    precip_mm   REAL,
+    month       INTEGER,
+    fetched_at  TEXT,
+    PRIMARY KEY (user_id, trip_id)
+);
+
+CREATE TABLE IF NOT EXISTS destination_climate (
+    destination_id  TEXT PRIMARY KEY,
+    climate         TEXT,
+    best_months     TEXT,
+    match           REAL,
+    fetched_at      TEXT
+);
+
 CREATE TABLE IF NOT EXISTS destination_guide (
     destination_id  TEXT PRIMARY KEY,
     understand      TEXT,

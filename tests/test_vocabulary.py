@@ -37,3 +37,8 @@ def test_expanded_vocabulary_terms():
 
 def test_canonical_set_union():
     assert {"coastal", "city"} <= canonical_set(["seaside town", "urban skyline"])
+
+
+def test_weather_terms():
+    assert "weather" in canonicalize("a dramatic sky")
+    assert "weather" in canonicalize("overcast morning")

@@ -212,6 +212,7 @@ def run_recommend(
     enricher=None,
     case_searcher=None,
     case_writer=None,
+    session=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -260,6 +261,18 @@ def run_recommend(
     tags = taste_attribute_weights(profile.tags)
     feedback = load_feedback(conn, user_id)
 
+    climate_profile = {}
+    climate_enabled = bool(
+        getattr(config, "climate", False)
+        or getattr(config, "climate_weight", 0.0)
+        or getattr(config, "season", "")
+    )
+    if climate_enabled:
+        from wanderlens.pipeline.climate import build_climate_profile, load_climate_profile
+
+        build_climate_profile(conn, user_id, session=session)
+        climate_profile = load_climate_profile(conn, user_id)
+
     shortlist_size = min(len(candidates), max(count * 4, 20))
     shortlist = rank_destinations(
         taste,
@@ -273,6 +286,21 @@ def run_recommend(
         visited_centers=centers,
         feedback=feedback,
     )
+
+    shortlist_climate: dict[str, float] = {}
+    shortlist_best_months: dict[str, list] = {}
+    if climate_profile:
+        from wanderlens.pipeline.climate import ensure_destination_climate
+
+        for rec in shortlist:
+            try:
+                data = ensure_destination_climate(
+                    conn, rec.destination, climate_profile, session=session
+                )
+            except Exception:
+                continue
+            shortlist_climate[rec.destination.id] = data["match"]
+            shortlist_best_months[rec.destination.id] = data["best_months"]
 
     popularity_scores: dict[str, float] = {}
     if popularity:
@@ -308,6 +336,10 @@ def run_recommend(
         novelty=novelty,
         popularity=popularity_scores,
         feedback=feedback,
+        climate=shortlist_climate or None,
+        climate_weight=getattr(config, "climate_weight", 0.0),
+        season=getattr(config, "season", "") or None,
+        best_months=shortlist_best_months or None,
     )
 
     visited_country = (

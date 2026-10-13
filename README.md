@@ -155,6 +155,13 @@ source by default; add Unsplash / Pexels by setting `WANDERLENS_UNSPLASH_KEY` /
 `WANDERLENS_PEXELS_KEY` (and listing them in `WANDERLENS_MEDIA_SOURCES`), and add
 diary links with `WANDERLENS_TRAVEL_BLOGS=url1,url2`.
 
+**Weather awareness:** with `climate: true` (or `WANDERLENS_CLIMATE=1`),
+`wanderlens` derives each trip's historical weather (Open-Meteo, keyless),
+aggregates a climate preference into your profile, and computes each destination's
+**best months for you** and a climate-match score (shown on the destination page).
+Optionally bias ranking with `recommend --climate-weight 0.15` or prefer a season
+with `recommend --season summer`; both are off by default.
+
 ### Web dashboard
 
 A local, read-only dashboard over the same data (FastAPI + Jinja + HTMX + a

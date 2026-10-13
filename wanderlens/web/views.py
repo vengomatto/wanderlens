@@ -16,6 +16,7 @@ from urllib.parse import quote_plus
 import numpy as np
 
 from wanderlens.catalog.case import load_case
+from wanderlens.pipeline.climate import load_destination_climate
 
 
 def _structure(text: str) -> tuple[str, list[str]]:
@@ -160,6 +161,8 @@ class DestinationDetail:
     diaries: list[dict] = field(default_factory=list)
     external_photo_links: list[dict] = field(default_factory=list)
     feedback_action: str = ""
+    best_months: list[int] = field(default_factory=list)
+    climate_match: float = 0.0
 
 
 @dataclass
@@ -448,6 +451,7 @@ def destination_detail(
     ]
 
     case = load_case(conn, destination_id) or {}
+    climate_fit = load_destination_climate(conn, destination_id)
     name = (rec["destination_name"] if rec else "") or destination_id
     country = (rec["destination_country"] if rec else "") or ""
     description_text = (
@@ -465,6 +469,8 @@ def destination_detail(
         case_sources=(case.get("sources") or []),
         case_source=(case.get("source") or ""),
         feedback_action=feedback_action(conn, user_id, destination_id),
+        best_months=climate_fit.get("best_months", []),
+        climate_match=climate_fit.get("match", 0.0),
         description_lead=description_lead,
         description_highlights=description_highlights,
         diaries=_json_list(guide["diaries"]) if guide and "diaries" in guide.keys() else [],

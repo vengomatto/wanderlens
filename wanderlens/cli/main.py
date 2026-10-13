@@ -70,6 +70,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-fetch destination media even if it is already cached",
     )
+    p_rec.add_argument(
+        "--season",
+        choices=["spring", "summer", "autumn", "winter"],
+        default=None,
+        help="prefer destinations whose best months include this season",
+    )
+    p_rec.add_argument(
+        "--climate-weight",
+        type=float,
+        default=None,
+        help="weight of the climate match in ranking (0 = off)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -159,6 +171,12 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
     config = load_config(args.config)
     config.refresh_media = config.refresh_media or args.refresh_media
+    if args.season:
+        config.season = args.season
+        config.climate = True
+    if args.climate_weight is not None:
+        config.climate_weight = args.climate_weight
+        config.climate = True
     explainer = None
     if args.explain_llm or config.explain_llm:
         if config.api_key:

@@ -349,3 +349,18 @@ def test_destination_detail_has_photo_links(tmp_path):
     labels = {link["label"] for link in detail.external_photo_links}
     assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
 
+
+def test_destination_shows_climate_fit(tmp_path):
+    conn = _seed(tmp_path)
+    conn.execute(
+        "INSERT INTO destination_climate "
+        "(destination_id, climate, best_months, match, fetched_at) "
+        "VALUES ('wy:algarve', '[]', '[6, 7]', 0.8, 'now')"
+    )
+    conn.commit()
+
+    detail = views.destination_detail(conn, 1, "wy:algarve")
+
+    assert detail.best_months == [6, 7]
+    assert detail.climate_match == 0.8
+

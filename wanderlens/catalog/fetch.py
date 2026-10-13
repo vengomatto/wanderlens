@@ -663,3 +663,40 @@ def fetch_climate(lat: float, lon: float, session=None, years: int = 5, timeout:
         }
         for month in range(1, 13)
     ]
+
+
+def fetch_trip_weather(
+    lat: float,
+    lon: float,
+    start_date: str,
+    end_date: str,
+    session=None,
+    timeout: int = 45,
+) -> Optional[dict]:
+    """Actual mean temperature and precipitation for a trip's date range."""
+    import requests
+
+    response = (session or requests).get(
+        OPEN_METEO_ARCHIVE,
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "start_date": start_date,
+            "end_date": end_date,
+            "daily": "temperature_2m_mean,precipitation_sum",
+            "timezone": "UTC",
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    daily = response.json().get("daily", {})
+    temps = [t for t in daily.get("temperature_2m_mean", []) if t is not None]
+    rains = [p for p in daily.get("precipitation_sum", []) if p is not None]
+    if not temps:
+        return None
+    return {
+        "temp_c": round(sum(temps) / len(temps), 1),
+        "precip_mm": round(sum(rains) / len(rains), 1) if rains else None,
+        "month": int(start_date[5:7]),
+    }

@@ -6,6 +6,7 @@ from typing import Callable, Iterable, Optional
 import numpy as np
 
 from wanderlens.core.models import Destination, Facet, Recommendation, TasteProfile
+from wanderlens.core.climate import season_overlap
 from wanderlens.core.taste import haversine_km
 from wanderlens.core.vocabulary import canonicalize
 
@@ -194,6 +195,10 @@ def rank_destinations(
     novelty_weight: float = 0.15,
     feedback: Optional[dict[str, str]] = None,
     feedback_weight: float = 0.15,
+    climate: Optional[dict[str, float]] = None,
+    climate_weight: float = 0.0,
+    season: Optional[str] = None,
+    best_months: Optional[dict[str, list]] = None,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -260,6 +265,12 @@ def rank_destinations(
             score += feedback_weight
         elif action in {"dislike", "skip"}:
             score -= feedback_weight
+
+        if climate is not None and climate_weight:
+            score += climate_weight * climate.get(destination.id, 0.0)
+        if season and best_months:
+            if season_overlap(best_months.get(destination.id, []), season):
+                score += max(climate_weight, 0.05)
 
         scored.append(
             (

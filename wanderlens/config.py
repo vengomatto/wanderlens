@@ -43,6 +43,9 @@ class Config:
     embedder: str = "clip"
     unsplash_key: Optional[str] = None
     pexels_key: Optional[str] = None
+    climate: bool = False
+    climate_weight: float = 0.0
+    season: str = ""
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -180,6 +183,15 @@ def load_config(
         embedder=values.get("embedder") or env.get("WANDERLENS_EMBEDDER") or "clip",
         unsplash_key=_pick(values.get("unsplash_key"), env.get("WANDERLENS_UNSPLASH_KEY")),
         pexels_key=_pick(values.get("pexels_key"), env.get("WANDERLENS_PEXELS_KEY")),
+        climate=(
+            bool(values.get("climate"))
+            if "climate" in values
+            else str(env.get("WANDERLENS_CLIMATE", "")).lower() in {"1", "true", "yes", "on"}
+        ),
+        climate_weight=float(
+            values.get("climate_weight") or env.get("WANDERLENS_CLIMATE_WEIGHT") or 0.0
+        ),
+        season=str(values.get("season") or env.get("WANDERLENS_SEASON") or "").lower(),
     )
 
 
