@@ -11,8 +11,31 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote_plus
 
 import numpy as np
+
+from wanderlens.catalog.case import load_case
+
+
+def _structure(text: str) -> tuple[str, list[str]]:
+    """Split prose into a lead sentence and highlight sentences for scannable display."""
+    import re
+
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", (text or "").strip()) if s.strip()]
+    if not sentences:
+        return "", []
+    return sentences[0], sentences[1:5]
+
+
+def external_photo_links(name: str, country: str = "") -> list[dict]:
+    """Outbound photo searches — links only, never embedded proprietary images."""
+    query = quote_plus(f"{name} {country}".strip())
+    return [
+        {"label": "Wikimedia Commons", "url": f"https://commons.wikimedia.org/w/index.php?search={query}"},
+        {"label": "Getty Images", "url": f"https://www.gettyimages.com/photos/{query}"},
+        {"label": "Google Images", "url": f"https://www.google.com/search?tbm=isch&q={query}"},
+    ]
 
 
 @dataclass
@@ -79,6 +102,8 @@ class DestinationDetail:
     lat: Optional[float]
     lon: Optional[float]
     short_description: str = ""
+    description_lead: str = ""
+    description_highlights: list[str] = field(default_factory=list)
     explanation: str = ""
     score: Optional[float] = None
     embedding_score: Optional[float] = None
@@ -106,6 +131,11 @@ class DestinationDetail:
     films: list[dict] = field(default_factory=list)
     itineraries: list[dict] = field(default_factory=list)
     similar_destinations: list[dict] = field(default_factory=list)
+    case_narrative: str = ""
+    case_sources: list[dict] = field(default_factory=list)
+    case_source: str = ""
+    diaries: list[dict] = field(default_factory=list)
+    external_photo_links: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -358,7 +388,7 @@ def destination_detail(
     ]
 
     guide = conn.execute(
-        "SELECT understand, links, books, pois, climate, films FROM destination_guide "
+        "SELECT understand, links, books, pois, climate, films, diaries FROM destination_guide "
         "WHERE destination_id = ?",
         (destination_id,),
     ).fetchone()
@@ -378,10 +408,27 @@ def destination_detail(
         )
     ]
 
+    case = load_case(conn, destination_id) or {}
+    name = (rec["destination_name"] if rec else "") or destination_id
+    country = (rec["destination_country"] if rec else "") or ""
+    description_text = (
+        (guide["understand"] if guide else "")
+        or (media["extract"] if media else "")
+        or ((rec["destination_description"] if rec else "") or "")
+    )
+    description_lead, description_highlights = _structure(description_text)
+
     return DestinationDetail(
         destination_id=destination_id,
-        name=(rec["destination_name"] if rec else "") or destination_id,
-        country=(rec["destination_country"] if rec else "") or "",
+        name=name,
+        country=country,
+        case_narrative=(case.get("narrative") or ""),
+        case_sources=(case.get("sources") or []),
+        case_source=(case.get("source") or ""),
+        description_lead=description_lead,
+        description_highlights=description_highlights,
+        diaries=_json_list(guide["diaries"]) if guide and "diaries" in guide.keys() else [],
+        external_photo_links=external_photo_links(name, country),
         lat=rec["destination_lat"] if rec else None,
         lon=rec["destination_lon"] if rec else None,
         short_description=(rec["destination_description"] if rec else "") or "",

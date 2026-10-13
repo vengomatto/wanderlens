@@ -38,7 +38,12 @@
   <div class="dest-grid">
     <section class="card">
       <h2>About</h2>
-      {% if detail.understand %}
+      {% if detail.description_lead %}
+      <p class="prose lead">{{ detail.description_lead }}</p>
+      {% if detail.description_highlights %}
+      <ul class="highlights">{% for point in detail.description_highlights %}<li>{{ point }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% elif detail.understand %}
       <p class="prose">{{ detail.understand }}</p>
       {% elif detail.extract %}
       <p class="prose">{{ detail.extract }}</p>
@@ -66,6 +71,23 @@
       </div>
     </section>
   </div>
+
+  {% if detail.case_narrative %}
+  <section class="card case-card">
+    <h2>The case for {{ detail.name }}</h2>
+    <p class="prose case-narrative">{{ detail.case_narrative }}</p>
+    {% if detail.case_sources %}
+    <p class="case-sources">
+      {% for src in detail.case_sources %}<a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.title or src.url }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+    {% if detail.external_photo_links %}
+    <p class="muted case-photos">More photos:
+      {% for link in detail.external_photo_links %}<a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+  </section>
+  {% endif %}
 
   <section class="card maps-card">
     <h2>Where it is</h2>
@@ -181,6 +203,17 @@
     <ul class="link-list">
       {% for link in detail.links %}
       <li><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.diaries %}
+  <section class="card">
+    <h2>Travel diaries &amp; journals</h2>
+    <ul class="link-list">
+      {% for diary in detail.diaries %}
+      <li><a href="{{ diary.url }}" target="_blank" rel="noopener">{{ diary.title or diary.url }}</a></li>
       {% endfor %}
     </ul>
   </section>

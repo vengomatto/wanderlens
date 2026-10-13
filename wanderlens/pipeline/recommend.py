@@ -9,6 +9,7 @@ from typing import Optional
 import numpy as np
 
 from wanderlens.catalog.destinations import JsonCatalog
+from wanderlens.catalog.case import build_case
 from wanderlens.catalog.fetch import build_catalog, enrich_records, load_geonames_cities
 from wanderlens.core.models import Facet, Recommendation, TasteProfile
 from wanderlens.core.recommend import (
@@ -198,6 +199,8 @@ def run_recommend(
     popularity: bool = False,
     popularity_fetcher=None,
     enricher=None,
+    case_searcher=None,
+    case_writer=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -322,6 +325,18 @@ def run_recommend(
         )
     conn.commit()
 
+    if case_searcher is not None or case_writer is not None:
+        for rec in recommendations:
+            try:
+                build_case(
+                    conn,
+                    rec.destination,
+                    searcher=case_searcher,
+                    writer=case_writer,
+                )
+            except Exception:
+                continue
+
     if media:
         fetcher = media_fetcher or _default_media_fetcher
         try:
@@ -399,9 +414,10 @@ def _explain(conn, user_id, rec, profile, visited_country, explainer) -> str:
 
 
 def _default_media_fetcher(conn, recommendations, config) -> int:
-    from wanderlens.catalog.media import fetch_media_for
+    from wanderlens.catalog.media import build_media_chain, fetch_media_for
 
-    return fetch_media_for(conn, recommendations, config.data_dir / "media")
+    chain = build_media_chain(sources=getattr(config, "media_sources", []))
+    return fetch_media_for(conn, recommendations, config.data_dir / "media", chain=chain)
 
 
 def _default_popularity_fetcher(conn, destinations) -> dict:

@@ -289,3 +289,25 @@ def test_run_guide_builds_for_recommendations(tmp_path):
     assert run_guide(config, session=_session()) == 1
     assert is_guide_cached(conn, "wv:Algarve")
     assert run_guide(config, session=_session()) == 0  # cached
+
+
+def test_derived_itinerary_without_model():
+    guide = gather_guide(_destination(), session=_session())
+
+    derived = [it for it in guide["itineraries"] if it["source"] == "derived"]
+    assert derived and derived[0]["days"]
+    assert any("Benagil Cave" in day["items"] for day in derived[0]["days"])
+
+
+def test_diaries_gathered_and_deduped():
+    guide = gather_guide(
+        _destination(),
+        session=_session(),
+        blogs=["https://www.visitalgarve.pt", "https://example.org/blog"],
+    )
+
+    urls = [diary["url"] for diary in guide["diaries"]]
+    assert "https://www.visitalgarve.pt" in urls
+    assert "https://example.org/blog" in urls
+    assert len(urls) == len(set(urls)), "diaries are deduplicated"
+

@@ -48,8 +48,29 @@ BAD_TITLE_WORDS = (
 )
 
 
+ASSESSED_CATEGORIES = ("quality images", "featured pictures", "valued images")
+
+
+def is_assessed(image: dict) -> bool:
+    """Whether a Commons file belongs to a Quality / Featured / Valued set."""
+    categories = (image.get("categories") or "").lower()
+    return any(marker in categories for marker in ASSESSED_CATEGORIES)
+
+
+def _dedupe_key(image: dict) -> str:
+    title = (image.get("title") or "").strip().lower()
+    if title:
+        return title
+    return (image.get("url") or "").rsplit("/", 1)[-1].lower()
+
+
 def filter_images(images: list[dict], min_width: int = MIN_WIDTH, limit: int = GALLERY_LIMIT) -> list[dict]:
-    """Keep usable photographs: photo mime, enough resolution, no blocklisted titles, deduped."""
+    """Keep usable photographs, best first.
+
+    Drops non-photo mime types, low-resolution files, and blocklisted titles;
+    deduplicates; then prefers assessed (Quality/Featured/Valued) images, then
+    larger and landscape-oriented ones.
+    """
     seen: set[str] = set()
     kept: list[dict] = []
     for image in images:
@@ -60,14 +81,20 @@ def filter_images(images: list[dict], min_width: int = MIN_WIDTH, limit: int = G
             continue
         if any(word in title for word in BAD_TITLE_WORDS):
             continue
-        key = title or image.get("url", "")
+        key = _dedupe_key(image)
         if key in seen:
             continue
         seen.add(key)
         kept.append(image)
-        if len(kept) >= limit:
-            break
-    return kept
+
+    kept.sort(
+        key=lambda image: (
+            not is_assessed(image),
+            int(image.get("height") or 0) >= int(image.get("width") or 0),
+            -int(image.get("width") or 0),
+        )
+    )
+    return kept[:limit]
 
 
 def _safe(call, *args, **kwargs):
@@ -77,14 +104,66 @@ def _safe(call, *args, **kwargs):
         return None
 
 
+class OpenverseMediaProvider:
+    """Additional openly-licensed images from the Openverse API (keyless).
+
+    Used as an *additional* source alongside Wikimedia/Commons; its images are
+    filtered and deduplicated like the rest, and a failure is ignored.
+    """
+
+    name = "openverse"
+    API = "https://api.openverse.org/v1/images/"
+
+    def __init__(self, session=None, timeout: int = 30, page_size: int = 20):
+        self.session = session
+        self.timeout = timeout
+        self.page_size = page_size
+
+    def images(self, destination: Destination) -> list[dict]:
+        import requests
+
+        from wanderlens.catalog.fetch import USER_AGENT
+
+        query = f"{destination.name} {destination.country}".strip()
+        response = (self.session or requests).get(
+            self.API,
+            params={"q": query, "page_size": self.page_size, "license_type": "commercial"},
+            headers={"User-Agent": USER_AGENT},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        images: list[dict] = []
+        for item in results:
+            url = item.get("url")
+            if not url:
+                continue
+            filetype = (item.get("filetype") or "jpg").lower()
+            mime = "image/jpeg" if filetype in {"jpg", "jpeg"} else f"image/{filetype}"
+            images.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": url,
+                    "width": int(item.get("width") or 0),
+                    "height": int(item.get("height") or 0),
+                    "mime": mime,
+                    "license": item.get("license", ""),
+                    "attribution": item.get("creator", ""),
+                    "source": "openverse",
+                }
+            )
+        return images
+
+
 class WikimediaMediaProvider:
     """Travel-oriented description (Wikivoyage) + Wikipedia hero + Commons gallery."""
 
     name = "wikimedia"
 
-    def __init__(self, session=None, gallery_limit: int = GALLERY_LIMIT):
+    def __init__(self, session=None, gallery_limit: int = GALLERY_LIMIT, extra_sources=None):
         self.session = session
         self.gallery_limit = gallery_limit
+        self.extra_sources = extra_sources or []
 
     def fetch(self, destination: Destination) -> Optional[DestinationMedia]:
         voyage = _safe(
@@ -125,6 +204,9 @@ class WikimediaMediaProvider:
             else None
         ) or destination.name
         curated.extend(_safe(fetch_commons_category, category, session=self.session) or [])
+
+        for source in self.extra_sources:
+            curated.extend(_safe(source.images, destination) or [])
 
         gallery = filter_images(curated)
 
@@ -210,8 +292,12 @@ class CommonsMediaProvider:
         )
 
 
-def build_media_chain(session=None) -> list:
-    return [WikimediaMediaProvider(session=session), CommonsMediaProvider(session=session)]
+def build_media_chain(session=None, sources=None) -> list:
+    extra = []
+    for name in sources or []:
+        if name == "openverse":
+            extra.append(OpenverseMediaProvider(session=session))
+    return [WikimediaMediaProvider(session=session, extra_sources=extra), CommonsMediaProvider(session=session)]
 
 
 def _safe_id(destination_id: str) -> str:

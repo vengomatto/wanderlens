@@ -31,6 +31,9 @@ class Config:
     facet_min_photos: int = 4
     alpha: float = 0.25
     enrich_taste: bool = True
+    build_case: bool = True
+    travel_blogs: list[str] = field(default_factory=list)
+    media_sources: list[str] = field(default_factory=list)
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -127,4 +130,23 @@ def load_config(
             if "enrich_taste" in values
             else str(env.get("WANDERLENS_ENRICH_TASTE", "1")).lower() in {"1", "true", "yes", "on"}
         ),
+        travel_blogs=_string_list(
+            values.get("travel_blogs") or env.get("WANDERLENS_TRAVEL_BLOGS")
+        ),
+        build_case=(
+            bool(values.get("build_case"))
+            if "build_case" in values
+            else str(env.get("WANDERLENS_BUILD_CASE", "1")).lower() in {"1", "true", "yes", "on"}
+        ),
+        media_sources=_string_list(
+            values.get("media_sources") or env.get("WANDERLENS_MEDIA_SOURCES")
+        ),
     )
+
+
+def _string_list(raw) -> list[str]:
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        return [item.strip() for item in raw.split(",") if item.strip()]
+    return [str(item).strip() for item in raw if str(item).strip()]

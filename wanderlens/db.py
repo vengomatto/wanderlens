@@ -151,6 +151,18 @@ CREATE TABLE IF NOT EXISTS taste_enrichment (
     PRIMARY KEY (user_id, kind, ref_id, input_hash)
 );
 
+CREATE TABLE IF NOT EXISTS destination_case (
+    destination_id  TEXT    NOT NULL,
+    input_hash      TEXT    NOT NULL,
+    model           TEXT,
+    prompt_version  TEXT,
+    narrative       TEXT,
+    sources         TEXT,
+    source          TEXT,
+    fetched_at      TEXT,
+    PRIMARY KEY (destination_id, input_hash)
+);
+
 CREATE TABLE IF NOT EXISTS destination_guide (
     destination_id  TEXT PRIMARY KEY,
     understand      TEXT,
@@ -159,6 +171,7 @@ CREATE TABLE IF NOT EXISTS destination_guide (
     pois            TEXT,
     climate         TEXT,
     films           TEXT,
+    diaries         TEXT,
     fetched_at      TEXT
 );
 
@@ -219,3 +232,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ):
         if column not in rec_columns:
             conn.execute(f"ALTER TABLE recommendations ADD COLUMN {column} {declaration}")
+
+    guide_columns = {row[1] for row in conn.execute("PRAGMA table_info(destination_guide)")}
+    if "diaries" not in guide_columns:
+        conn.execute("ALTER TABLE destination_guide ADD COLUMN diaries TEXT")

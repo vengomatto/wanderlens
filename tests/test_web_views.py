@@ -284,3 +284,32 @@ def test_destination_detail_without_guide(tmp_path):
     assert detail.links == []
     assert detail.itineraries == []
     assert detail.similar_destinations[0]["id"] == "wy:algarve"
+
+
+def test_structure_splits_lead_and_highlights():
+    lead, points = views._structure("First sentence. Second one. Third one.")
+    assert lead == "First sentence."
+    assert points == ["Second one.", "Third one."]
+
+
+def test_external_photo_links_are_outbound_only():
+    links = views.external_photo_links("Kotor", "Montenegro")
+    labels = {link["label"] for link in links}
+    assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
+    assert all(link["url"].startswith("https://") for link in links)
+
+
+def test_destination_detail_includes_case(tmp_path):
+    conn = _seed(tmp_path)
+    conn.execute(
+        "INSERT INTO destination_case "
+        "(destination_id, input_hash, narrative, sources, source) "
+        "VALUES ('wy:algarve', 'h', 'A compelling case.', '[]', 'llm')"
+    )
+    conn.commit()
+
+    detail = views.destination_detail(conn, 1, "wy:algarve")
+
+    assert detail.case_narrative == "A compelling case."
+    assert detail.case_source == "llm"
+

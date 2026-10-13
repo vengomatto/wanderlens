@@ -77,6 +77,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval.add_argument("--k", type=int, default=3, help="cut-off for precision@k (synthetic)")
     p_eval.set_defaults(func=cmd_eval)
 
+    p_syn = sub.add_parser(
+        "synthetic",
+        help="generate a runnable mock photo archive + catalog for a broad test dataset",
+    )
+    p_syn.add_argument("--dir", required=True, help="target directory to write the archive into")
+    p_syn.add_argument("--trips-per-taste", type=int, default=8)
+    p_syn.add_argument("--destinations-per-taste", type=int, default=12)
+    p_syn.set_defaults(func=cmd_synthetic)
+
     p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
     p_serve.add_argument("--host", default="127.0.0.1", help="bind host (localhost only by default)")
     p_serve.add_argument("--port", type=int, default=8000, help="port to listen on")
@@ -143,6 +152,18 @@ def cmd_recommend(args: argparse.Namespace) -> int:
             explainer = HostedExplanationSynthesizer(config.api_key, config.llm_model)
         else:
             print("No API key configured; using the deterministic explanation.")
+
+    case_searcher = None
+    case_writer = None
+    if config.build_case:
+        from wanderlens.catalog.search import DuckDuckGoSearchProvider
+
+        case_searcher = DuckDuckGoSearchProvider()
+        if config.api_key:
+            from wanderlens.models.case import HostedCaseWriter
+
+            case_writer = HostedCaseWriter(config.api_key, config.llm_model)
+
     recs = run_recommend(
         config,
         user_name=args.user,
@@ -153,6 +174,8 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         diversity=args.diversity,
         novelty=args.novelty,
         popularity=True,
+        case_searcher=case_searcher,
+        case_writer=case_writer,
     )
     if not recs:
         print("No recommendations.")
@@ -177,6 +200,25 @@ def cmd_eval(args: argparse.Namespace) -> int:
         print(run_synthetic_eval(k=args.k))
         return 0
     print(run_eval(config, user_name=args.user, holdout=args.holdout))
+    return 0
+
+
+def cmd_synthetic(args: argparse.Namespace) -> int:
+    from wanderlens.synthetic import materialize
+
+    counts = materialize(
+        args.dir,
+        trips_per_taste=args.trips_per_taste,
+        destinations_per_taste=args.destinations_per_taste,
+    )
+    print(
+        f"Wrote {counts['photos']} photos, {counts['trips']} trips, "
+        f"and {counts['destinations']} destinations into {args.dir}"
+    )
+    print(f"Then run: WANDERLENS_DATA_DIR={args.dir} .venv/bin/python -m wanderlens ingest")
+    print(
+        f"          WANDERLENS_DATA_DIR={args.dir} .venv/bin/python -m wanderlens recommend --count 10"
+    )
     return 0
 
 

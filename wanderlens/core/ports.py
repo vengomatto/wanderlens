@@ -89,3 +89,36 @@ class ItinerarySynthesizer(Protocol):
 
     def synthesize(self, destination: Destination, pois: list, days: int) -> list:
         ...
+
+
+class SearchProvider(Protocol):
+    """A keyless-or-keyed web search behind a seam. Must return a list of
+    ``{"title", "url", "snippet"}`` dicts and never raise for callers that
+    treat search as best-effort."""
+
+    name: str
+
+    def search(self, query: str, limit: int = 5) -> list[dict]:
+        ...
+
+
+class CaseWriter(Protocol):
+    """Turns gathered facts and search results into a grounded destination case.
+    Injectable and pinned; a failure must fall back to the keyless narrative."""
+
+    name: str
+    prompt_version: str
+
+    def write(self, destination: Destination, facts: dict, search_results: list[dict]) -> dict:
+        ...
+
+
+class ImageSourceProvider(Protocol):
+    """Supplies additional openly-licensed images for a Destination. Must return
+    a list of ``{url, width, height, mime, license, attribution, source}`` dicts
+    and never raise for callers that treat extra sources as best-effort."""
+
+    name: str
+
+    def images(self, destination: Destination) -> list[dict]:
+        ...

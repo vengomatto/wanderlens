@@ -86,6 +86,7 @@ already-downloaded files):
 .venv/bin/python -m wanderlens recommend --count 5
 .venv/bin/python -m wanderlens eval [--holdout Malta] [--synthetic]
 .venv/bin/python -m wanderlens guide [--count 5] [--refresh] [--no-llm]
+.venv/bin/python -m wanderlens synthetic --dir /tmp/wl-syn   # runnable mock archive
 ```
 
 The "why this is for you" is evidence-based: each Recommendation names the
@@ -114,6 +115,24 @@ or any model error falls back to the local, deterministic representation
 
 `eval --synthetic` ranks a reproducible synthetic gallery and reports
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
+
+`wanderlens synthetic --dir <dir>` writes a deterministic **runnable mock
+archive** (photos with EXIF plus a candidate catalog); point
+`WANDERLENS_DATA_DIR=<dir>` at it and run `ingest` / `recommend` to exercise the
+whole pipeline on a broad dataset instead of a few photos.
+
+Each recommended destination also gets a **sourced case** — a short narrative
+plus citation links — built from Wikivoyage/Wikipedia/Wikidata. With an
+`OPENROUTER_API_KEY`, DuckDuckGo web search and the model write a more
+captivating, grounded version (cached by input + model + prompt; the keyless case
+is always the fallback). Guides include a **deterministic day-by-day itinerary**
+from the destination's points of interest (no key needed; the LLM itinerary is
+used when a key is present), **travel diaries/journals**, and a scannable
+description. Images prefer Wikimedia Commons **Quality / Featured / Valued**
+files, and external photo searches (Commons, Getty, Google Images) are linked
+out — proprietary images are never embedded. Opt into extra sources (Openverse)
+with `WANDERLENS_MEDIA_SOURCES=openverse`, and add diary links with
+`WANDERLENS_TRAVEL_BLOGS=url1,url2`.
 
 ### Web dashboard
 

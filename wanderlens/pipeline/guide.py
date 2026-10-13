@@ -47,5 +47,10 @@ def run_guide(
     user_id = get_or_create_user(conn, user_name)
     destinations = load_recommended_destinations(conn, user_id, count)
     return build_guides_for(
-        conn, destinations, session=session, synthesizer=synthesizer, refresh=refresh
+        conn,
+        destinations,
+        session=session,
+        synthesizer=synthesizer,
+        refresh=refresh,
+        blogs=getattr(config, "travel_blogs", []),
     )

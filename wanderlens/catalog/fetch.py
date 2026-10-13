@@ -249,6 +249,7 @@ def _image_from_info(page: dict) -> Optional[dict]:
         "mime": info.get("mime", ""),
         "license": _strip_html(_meta(metadata, "LicenseShortName")),
         "attribution": _strip_html(_meta(metadata, "Artist")),
+        "categories": _strip_html(_meta(metadata, "Categories")),
         "source": "commons",
     }
 
