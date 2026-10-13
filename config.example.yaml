@@ -1,0 +1,23 @@
+# Example Wanderlens configuration.
+#
+# Copy to `config.yaml` (gitignored) and fill in your keys, or point at it with
+# `wanderlens --config config.example.yaml ...`. It is auto-discovered from the
+# working directory, ./data/config.yaml, or ~/.config/wanderlens/config.yaml.
+# Environment variables (e.g. OPENROUTER_API_KEY) still work.
+
+# api_key: <your OpenRouter API key>       # or set OPENROUTER_API_KEY
+llm_model: meta-llama/llama-3.1-8b-instruct
+vlm_model: openai/gpt-4o-mini
+
+# Optional extras:
+# unsplash_key: <unsplash-access-key>
+# pexels_key: <pexels-api-key>
+# media_sources: [openverse, unsplash, pexels]
+# travel_blogs: [https://www.nomadicmatt.com/travel-guides/]
+# alpha: 0.25
+# enrich_taste: true
+# build_case: true
+# refresh_media: false
+# embedder: clip
+# exclude_radius_km: 60
+# catalog_source: wikivoyage

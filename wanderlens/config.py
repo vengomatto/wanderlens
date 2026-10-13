@@ -55,6 +55,24 @@ def _pick(*candidates: Optional[str]) -> Optional[str]:
     return None
 
 
+def _resolve_config_path(config_path: Optional[str | Path], env: Mapping[str, str]):
+    """Find the config file to load: explicit, env, or a discovered default."""
+    if config_path:
+        return Path(config_path)
+    from_env = env.get("WANDERLENS_CONFIG")
+    if from_env:
+        return Path(from_env).expanduser()
+    for candidate in (
+        Path("config.yaml"),
+        Path("config.yml"),
+        Path("data") / "config.yaml",
+        Path.home() / ".config" / "wanderlens" / "config.yaml",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def load_config(
     config_path: Optional[str | Path] = None,
     env: Optional[Mapping[str, str]] = None,
@@ -62,10 +80,11 @@ def load_config(
     env = dict(os.environ if env is None else env)
 
     values: dict = {}
-    if config_path and Path(config_path).exists():
-        loaded = yaml.safe_load(Path(config_path).read_text()) or {}
+    resolved = _resolve_config_path(config_path, env)
+    if resolved and Path(resolved).exists():
+        loaded = yaml.safe_load(Path(resolved).read_text()) or {}
         if not isinstance(loaded, dict):
-            raise ValueError(f"config {config_path} must be a mapping")
+            raise ValueError(f"config {resolved} must be a mapping")
         values = loaded
 
     data_dir = Path(values.get("data_dir") or env.get("WANDERLENS_DATA_DIR") or "data").expanduser()
@@ -81,6 +100,7 @@ def load_config(
 
     api_key = _pick(
         values.get("api_key"),
+        values.get("openrouter_api_key"),
         env.get("WANDERLENS_VLM_API_KEY"),
         env.get("OPENROUTER_API_KEY"),
         env.get("ANTHROPIC_API_KEY"),

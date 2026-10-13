@@ -12,6 +12,8 @@ if [ -f data/wanderlens.sqlite3 ]; then
   cp data/wanderlens.sqlite3 "$SMOKE_DIR/wl.sqlite3"
 fi
 export WANDERLENS_DB="$SMOKE_DIR/wl.sqlite3"
+# Ignore any local config.yaml so the smoke run stays hermetic (no API key/calls).
+export WANDERLENS_CONFIG="$SMOKE_DIR/none.yaml"
 
 echo "== ingest =="
 $PY -m wanderlens ingest

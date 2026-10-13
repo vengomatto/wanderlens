@@ -90,6 +90,14 @@ already-downloaded files):
 .venv/bin/python -m wanderlens feedback --destination wv:Kotor --action like
 ```
 
+### Configuration
+
+`wanderlens` loads a local `config.yaml` automatically (from the working
+directory, `./data/config.yaml`, or `~/.config/wanderlens/config.yaml`) unless
+`--config <path>` is given, so secrets like your `api_key` do not need to be
+exported every time. Environment variables still work as a fallback. See
+`config.example.yaml`.
+
 The "why this is for you" is evidence-based: each Recommendation names the
 closest of your trips, the attributes it shares with your taste (weighted by how
 often they recur), and how new it is (distance from your nearest visit). Add
