@@ -17,6 +17,19 @@ CLIP_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
 CLIP_STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
 IMAGE_SIZE = 224
 CONTEXT_LENGTH = 77
+EOS_TOKEN_ID = 49407
+
+
+def _truncate_with_eos(ids: list[int]) -> list[int]:
+    """Truncate to fit the context while always keeping the CLIP end token.
+
+    CLIP pools the text at the end token; dropping it makes long texts collapse
+    to the same vector, so the end token is re-appended after truncation.
+    """
+    ids = list(ids)[: CONTEXT_LENGTH - 1]
+    if not ids or ids[-1] != EOS_TOKEN_ID:
+        ids.append(EOS_TOKEN_ID)
+    return ids + [0] * (CONTEXT_LENGTH - len(ids))
 
 
 def ensure_model(cache_dir: str | Path = "data/models") -> Path:
@@ -59,6 +72,10 @@ class OnnxClipEmbedder:
     @property
     def name(self) -> str:
         return DEFAULT_REPO_DIRNAME
+
+    @property
+    def cache_key(self) -> str:
+        return f"{DEFAULT_REPO_DIRNAME}-textv2"
 
     @property
     def dim(self) -> int:
@@ -108,9 +125,7 @@ class OnnxClipEmbedder:
         return self._normalize(embeds[0])
 
     def _encode_text(self, text: str) -> np.ndarray:
-        ids = self._tokenizer.encode(text).ids[:CONTEXT_LENGTH]
-        ids = ids + [0] * (CONTEXT_LENGTH - len(ids))
-        return np.array([ids], dtype=np.int64)
+        return np.array([_truncate_with_eos(self._tokenizer.encode(text).ids)], dtype=np.int64)
 
     def embed_text(self, text: str) -> np.ndarray:
         session = self._session("text")

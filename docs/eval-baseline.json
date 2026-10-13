@@ -1,0 +1,8 @@
+{
+  "trips": 6,
+  "mrr": 0.001,
+  "recall@10": 0.0,
+  "recall@50": 0.0,
+  "margin": 0.05,
+  "note": "Leave-one-trip-out baseline recorded 2026-10-13 after the CLIP truncation fix (collapsed_share 0.0). Low absolute values reflect the thin, Europe-only catalog (IMPROVEMENT_PLAN workstream B), not a regression gate to relax."
+}

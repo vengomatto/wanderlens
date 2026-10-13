@@ -14,6 +14,21 @@ WIKIVOYAGE_API = "https://en.wikivoyage.org/w/api.php"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
+_HEADING_RE = re.compile(r"=+\s*[^=\n]+?\s*=+")
+
+
+def clean_extract(text: str, max_chars: Optional[int] = None) -> str:
+    """Strip wikitext headings and cut at a sentence boundary (not mid-sentence)."""
+    text = _HEADING_RE.sub(" ", text or "")
+    text = " ".join(text.split())
+    if max_chars and len(text) > max_chars:
+        head = text[:max_chars]
+        cut = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+        if cut > max_chars // 2:
+            return head[: cut + 1].rstrip()
+        return head.rsplit(" ", 1)[0].rstrip(" ,.;:") + "…"
+    return text
+
 
 def fetch_wikipedia_summary(
     name: str, country: str = "", session=None, timeout: int = 30
@@ -43,8 +58,7 @@ def fetch_wikipedia_summary(
     if not pages:
         return ""
     page = next(iter(pages.values()))
-    extract = " ".join(page.get("extract", "").split())
-    return extract[:300]
+    return clean_extract(page.get("extract", ""), 300)
 
 
 def _strip_html(value: str) -> str:
@@ -119,7 +133,7 @@ def fetch_wikivoyage_page(
     if not pages:
         return None
     page = next(iter(pages.values()))
-    extract = " ".join(page.get("extract", "").split())
+    extract = clean_extract(page.get("extract", ""))
     wikidata_id = (page.get("pageprops") or {}).get("wikibase_item", "")
     external = [e.get("*", "") for e in page.get("extlinks", []) if e.get("*")]
     itineraries = [
@@ -170,6 +184,7 @@ def fetch_wikipedia_media(
             "gsrlimit": 1,
             "prop": "extracts|pageimages|info",
             "explaintext": 1,
+            "exintro": 1,
             "exlimit": 1,
             "piprop": "thumbnail",
             "pithumbsize": 1280,
@@ -184,9 +199,7 @@ def fetch_wikipedia_media(
     if not pages:
         return None
     page = next(iter(pages.values()))
-    extract = " ".join(page.get("extract", "").split())
-    if len(extract) > max_chars:
-        extract = extract[:max_chars].rsplit(" ", 1)[0]
+    extract = clean_extract(page.get("extract", ""), max_chars)
     thumbnail = (page.get("thumbnail") or {}).get("source", "")
     if not extract and not thumbnail:
         return None

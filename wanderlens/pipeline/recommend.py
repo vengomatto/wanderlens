@@ -93,7 +93,7 @@ def load_taste_facets(
 
 def ensure_destination_embeddings(conn, destinations, embedder, model=None):
     """Return {destination_id: vector}, computing and caching missing ones."""
-    model = model or getattr(embedder, "name", "default")
+    model = model or getattr(embedder, "cache_key", None) or getattr(embedder, "name", "default")
     cached = {
         row["destination_id"]: np.frombuffer(row["vector"], dtype=np.float32)
         for row in conn.execute(
@@ -213,6 +213,7 @@ def run_recommend(
     case_searcher=None,
     case_writer=None,
     session=None,
+    diagnose: bool = False,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -310,18 +311,6 @@ def run_recommend(
         except Exception:
             popularity_scores = {}
 
-    if case_searcher is not None or case_writer is not None:
-        for rec in shortlist:
-            try:
-                build_case(
-                    conn,
-                    rec.destination,
-                    searcher=case_searcher,
-                    writer=case_writer,
-                )
-            except Exception:
-                continue
-
     recommendations = rank_destinations(
         taste,
         [rec.destination for rec in shortlist],
@@ -341,6 +330,24 @@ def run_recommend(
         season=getattr(config, "season", "") or None,
         best_months=shortlist_best_months or None,
     )
+
+    if diagnose:
+        from wanderlens.core.evaluate import diagnostics
+
+        report = diagnostics(list(vectors.values()), recommendations)
+        print(f"[diagnose] {report}")
+
+    if case_searcher is not None or case_writer is not None:
+        for rec in recommendations:
+            try:
+                build_case(
+                    conn,
+                    rec.destination,
+                    searcher=case_searcher,
+                    writer=case_writer,
+                )
+            except Exception:
+                continue
 
     visited_country = (
         max(profile.geography, key=profile.geography.get) if profile.geography else None

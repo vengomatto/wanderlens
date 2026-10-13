@@ -89,21 +89,27 @@ def _store_geography(conn: sqlite3.Connection, user_id: int, trips: list[Trip]) 
         )
 
 
-def _embed_photos(conn: sqlite3.Connection, user_id: int, photos: list[Photo], embedder) -> None:
+def _embed_photos(conn: sqlite3.Connection, user_id: int, photos: list[Photo], embedder) -> int:
     existing = {
         row[0]
         for row in conn.execute(
             "SELECT photo_id FROM photo_embeddings WHERE user_id = ?", (user_id,)
         )
     }
+    skipped = 0
     for photo in photos:
         if photo.id in existing:
             continue
-        vector = embedder.embed_image(photo.path)
+        try:
+            vector = embedder.embed_image(photo.path)
+        except Exception:
+            skipped += 1
+            continue
         conn.execute(
             "INSERT OR REPLACE INTO photo_embeddings (user_id, photo_id, dim, vector) VALUES (?, ?, ?, ?)",
             (user_id, photo.id, int(vector.shape[0]), vector.astype("float32").tobytes()),
         )
+    return skipped
 
 
 def _store_subjects(
@@ -166,6 +172,7 @@ def run_profile(
     sample_per_trip: int = 3,
     retag: bool = False,
     enricher=None,
+    stats: Optional[dict] = None,
 ) -> list[Trip]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -189,7 +196,9 @@ def run_profile(
         from wanderlens.models.embeddings import OnnxClipEmbedder
 
         embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
-    _embed_photos(conn, user_id, photos, embedder)
+    skipped = _embed_photos(conn, user_id, photos, embedder)
+    if stats is not None:
+        stats["photos_skipped"] = skipped
 
     if vision is not None:
         existing_subjects = conn.execute(

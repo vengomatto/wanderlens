@@ -58,6 +58,20 @@ class OsmSession:
         return _Response(self.overpass)
 
 
+def test_clean_extract_strips_headings_and_cuts_at_sentence():
+    from wanderlens.catalog.fetch import clean_extract
+
+    text = "== Cities == 1 Antofagasta is a city. == See == More text here."
+    cleaned = clean_extract(text)
+    assert "==" not in cleaned
+    assert "Antofagasta" in cleaned
+
+    long_text = "First sentence here. Second sentence follows. Third sentence keeps going."
+    cut = clean_extract(long_text, 30)
+    assert "First sentence here." in cut
+    assert cut.endswith(".") or cut.endswith("…")
+
+
 def test_fetch_wikipedia_summary_parses():
     session = FakeSession(
         {"query": {"pages": {"1": {"title": "Cartagena, Spain", "extract": "Cartagena is a coastal city in Spain. It has a port."}}}}

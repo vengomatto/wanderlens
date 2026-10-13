@@ -164,6 +164,28 @@ def test_tagging_is_idempotent(tmp_path):
     assert vision.calls > calls
 
 
+def test_unreadable_photo_is_skipped_and_counted(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)
+
+    class FlakyEmbedder(FakeEmbedder):
+        def embed_image(self, path):
+            if path.endswith("a.jpg"):
+                raise RuntimeError("unreadable")
+            return super().embed_image(path)
+
+    stats = {}
+    run_profile(
+        config,
+        embedder=FlakyEmbedder(),
+        vision=None,
+        reverse_geocoder=_italy,
+        stats=stats,
+    )
+
+    assert stats["photos_skipped"] == 1
+
+
 def test_profile_uses_enricher_for_structured_attributes(tmp_path):
     config = _config(tmp_path)
     _seed(config)

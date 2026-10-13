@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections import Counter
+
+import numpy as np
 
 
 @dataclass
@@ -42,12 +45,7 @@ def evaluate_resurfacing(ranked, center, radius_km: float, within_top: int, labe
 
 
 def precision_at_k(ranked_ids, relevant, k: int) -> float:
-    """Fraction of the top-``k`` ranked ids that are relevant.
-
-    Denominates by the number of ranked ids actually available (up to ``k``), so
-    a perfectly relevant ranking reports 1.0 even when fewer than ``k`` items
-    were returned.
-    """
+    """Fraction of the top-``k`` ranked ids that are relevant."""
     ids = list(ranked_ids)
     top = ids[:k]
     if not top or not relevant:
@@ -64,3 +62,57 @@ def mrr(ranked_ids, relevant) -> float:
         if item in relevant:
             return 1.0 / position
     return 0.0
+
+
+def recall_at_k(rank: int | None, k: int) -> float:
+    """1.0 when the relevant item appears within the top ``k``, else 0.0."""
+    return 1.0 if rank is not None and rank <= k else 0.0
+
+
+def mean_reciprocal_rank(ranks) -> float:
+    """Average reciprocal rank over a list of ranks (``None`` = not found)."""
+    ranks = list(ranks)
+    if not ranks:
+        return 0.0
+    return sum(1.0 / rank for rank in ranks if rank) / len(ranks)
+
+
+def check_regression(mrr_value: float, baseline_mrr: float, margin: float = 0.05) -> bool:
+    """True when ``mrr_value`` is within ``margin`` of the baseline (no regression)."""
+    return mrr_value >= baseline_mrr - margin
+
+
+def collapsed_share(vectors) -> float:
+    """Share of vectors that are near-identical (cosine > 0.99) to another."""
+    array = [np.asarray(vector, dtype=np.float32) for vector in vectors if vector is not None]
+    if len(array) < 2:
+        return 0.0
+    matrix = np.stack(
+        [v / np.linalg.norm(v) if np.linalg.norm(v) else v for v in array]
+    )
+    similarities = matrix @ matrix.T
+    np.fill_diagonal(similarities, -1.0)
+    collapsed = int((similarities.max(axis=1) > 0.99).sum())
+    return round(collapsed / len(array), 4)
+
+
+def diagnostics(vectors, recommendations) -> dict:
+    """Component spread, collapsed-vector share, and top-result mix."""
+
+    def spread(values) -> float:
+        vals = [v for v in values if v is not None]
+        return round(float(np.std(vals)), 4) if vals else 0.0
+
+    attributes = Counter(
+        attribute for rec in recommendations for attribute in rec.matched_attributes
+    )
+    countries = Counter(rec.destination.country for rec in recommendations)
+    return {
+        "n": len(recommendations),
+        "score_std": spread([rec.score for rec in recommendations]),
+        "embedding_std": spread([rec.embedding_score for rec in recommendations]),
+        "attribute_std": spread([rec.attribute_score for rec in recommendations]),
+        "collapsed_share": collapsed_share(vectors),
+        "top_attributes": attributes.most_common(5),
+        "top_countries": countries.most_common(5),
+    }

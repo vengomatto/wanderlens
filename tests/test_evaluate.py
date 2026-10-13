@@ -2,7 +2,17 @@ import numpy as np
 
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.config import Config
-from wanderlens.core.evaluate import evaluate_holdout, evaluate_resurfacing, mrr, precision_at_k
+from wanderlens.core.evaluate import (
+    check_regression,
+    collapsed_share,
+    diagnostics,
+    evaluate_holdout,
+    evaluate_resurfacing,
+    mean_reciprocal_rank,
+    mrr,
+    precision_at_k,
+    recall_at_k,
+)
 from wanderlens.core.models import Destination, Recommendation
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.evaluate import run_eval, run_synthetic_eval
@@ -133,4 +143,36 @@ def test_synthetic_eval_reports_metrics():
     assert "MRR" in text
     assert "precision@3 = 1.00" in text, text
     assert "MRR = 1.00" in text, text
+
+
+def test_recall_and_mean_reciprocal_rank():
+    assert recall_at_k(5, 10) == 1.0
+    assert recall_at_k(15, 10) == 0.0
+    assert recall_at_k(None, 10) == 0.0
+    assert abs(mean_reciprocal_rank([1, 2, None]) - (1.0 + 0.5) / 3) < 1e-9
+    assert mean_reciprocal_rank([]) == 0.0
+
+
+def test_check_regression():
+    assert check_regression(0.5, 0.5) is True
+    assert check_regression(0.48, 0.5, 0.05) is True
+    assert check_regression(0.4, 0.5, 0.05) is False
+
+
+def test_collapsed_share_and_diagnostics():
+    a = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    b = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    c = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+    assert collapsed_share([a, b, c]) > 0
+    assert collapsed_share([a]) == 0.0
+
+    destination = Destination(id="d", name="D", lat=1, lon=1, country="X")
+    rec = Recommendation(
+        destination=destination, score=0.5, rank=1, embedding_score=0.4,
+        attribute_score=0.6, matched_attributes={"coastal": 0.5},
+    )
+    report = diagnostics([a, c], [rec])
+    assert report["n"] == 1
+    assert "collapsed_share" in report
+    assert report["top_countries"][0][0] == "X"
 

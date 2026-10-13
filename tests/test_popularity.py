@@ -1,6 +1,19 @@
 from wanderlens.catalog.popularity import fetch_pageviews, fetch_popularity_for, is_cached
 from wanderlens.core.models import Destination
-from wanderlens.core.recommend import normalize_popularity, popularity_label
+from wanderlens.core.recommend import normalize_popularity, percentile_labels, popularity_label
+
+
+def test_percentile_labels_split_roughly_thirds():
+    scores = {f"d{i}": i / 10 for i in range(10)}
+
+    labels = percentile_labels(scores)
+
+    assert set(labels.values()) <= {"famous", "balanced", "uncommon"}
+    assert labels["d9"] == "famous"
+    assert labels["d0"] == "uncommon"
+    from collections import Counter
+
+    assert max(Counter(labels.values()).values()) <= len(scores) * 0.6
 from wanderlens.db import connect, init_db
 
 

@@ -5,7 +5,14 @@ from typing import Optional
 
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.catalog.fetch import country_code_for_name
-from wanderlens.core.evaluate import evaluate_resurfacing, mrr, precision_at_k
+from wanderlens.core.evaluate import (
+    diagnostics,
+    evaluate_resurfacing,
+    mean_reciprocal_rank,
+    mrr,
+    precision_at_k,
+    recall_at_k,
+)
 from wanderlens.core.gallery import build_gallery
 from wanderlens.core.recommend import (
     filter_unvisited_proximity,
@@ -143,6 +150,79 @@ def run_eval(
     )
     result = evaluate_resurfacing(ranked, (hold["lat"], hold["lon"]), radius, within_top, label)
     return result.describe()
+
+
+def run_loto(
+    config,
+    user_name: str = "owner",
+    embedder=None,
+    catalog: Optional[JsonCatalog] = None,
+    providers=None,
+    within_top: int = 50,
+    radius: Optional[float] = None,
+) -> dict:
+    """Leave-one-trip-out evaluation over every trip, averaged.
+
+    Hides each trip in turn, rebuilds taste from the rest, and records the rank of
+    the first destination near the hidden trip. Reports MRR, Recall@10, Recall@50.
+    """
+    from wanderlens.pipeline.ingest import get_or_create_user
+
+    conn = connect(config.db_path)
+    init_db(conn)
+    user_id = get_or_create_user(conn, user_name)
+
+    trips = conn.execute(
+        "SELECT id, city, country, lat, lon FROM trips "
+        "WHERE user_id = ? AND lat IS NOT NULL AND lon IS NOT NULL ORDER BY id",
+        (user_id,),
+    ).fetchall()
+    if not trips:
+        return {"trips": 0, "mrr": 0.0, "recall@10": 0.0, "recall@50": 0.0}
+
+    if embedder is None:
+        from wanderlens.models.embeddings import OnnxClipEmbedder
+
+        embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
+    catalog = catalog or _eval_catalog(config, "", providers=providers)
+    radius = radius if radius is not None else getattr(config, "exclude_radius_km", 60.0)
+
+    ranks: list[Optional[int]] = []
+    for hold in trips:
+        taste = load_taste_embedding(conn, user_id)
+        facets = load_taste_facets(conn, user_id, exclude_trip_id=hold["id"])
+        if not facets and taste is None:
+            continue
+        centers = [
+            (trip["lat"], trip["lon"])
+            for trip in trips
+            if trip["id"] != hold["id"]
+        ]
+        candidates = filter_unvisited_proximity(catalog.candidates(), centers, radius)
+        vectors = ensure_destination_embeddings(conn, candidates, embedder)
+        others = [trip for trip in trips if trip["id"] != hold["id"]]
+        weights = _attribute_weights_excluding(conn, user_id, hold["id"], len(others))
+        ranked = rank_destinations(
+            taste,
+            candidates,
+            embedder.embed_text,
+            top_k=None,
+            vectors=vectors,
+            taste_tags=taste_attribute_weights(weights),
+            taste_facets=facets,
+        )
+        result = evaluate_resurfacing(
+            ranked, (hold["lat"], hold["lon"]), radius, within_top, str(hold["id"])
+        )
+        ranks.append(result.rank)
+
+    count = len(ranks) or 1
+    return {
+        "trips": len(ranks),
+        "mrr": round(mean_reciprocal_rank(ranks), 3),
+        "recall@10": round(sum(recall_at_k(r, 10) for r in ranks) / count, 3),
+        "recall@50": round(sum(recall_at_k(r, 50) for r in ranks) / count, 3),
+    }
 
 
 def run_synthetic_eval(k: int = 3, alpha: Optional[float] = None) -> str:

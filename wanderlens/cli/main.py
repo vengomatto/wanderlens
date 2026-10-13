@@ -82,6 +82,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="weight of the climate match in ranking (0 = off)",
     )
+    p_rec.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="print score diagnostics (component spread, collapsed-vector share, top mix)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -92,6 +97,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="rank the reproducible synthetic gallery instead of the archive",
     )
     p_eval.add_argument("--k", type=int, default=3, help="cut-off for precision@k (synthetic)")
+    p_eval.add_argument(
+        "--loto",
+        action="store_true",
+        help="leave-one-trip-out evaluation (MRR, Recall@10, Recall@50)",
+    )
     p_eval.set_defaults(func=cmd_eval)
 
     p_syn = sub.add_parser(
@@ -209,6 +219,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         popularity=True,
         case_searcher=case_searcher,
         case_writer=case_writer,
+        diagnose=args.diagnose,
     )
     if not recs:
         print("No recommendations.")
@@ -231,6 +242,11 @@ def cmd_eval(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     if args.synthetic:
         print(run_synthetic_eval(k=args.k))
+        return 0
+    if args.loto:
+        from wanderlens.pipeline.evaluate import run_loto
+
+        print(run_loto(config, user_name=args.user))
         return 0
     print(run_eval(config, user_name=args.user, holdout=args.holdout))
     return 0

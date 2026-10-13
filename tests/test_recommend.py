@@ -49,6 +49,34 @@ class CountingEmbedder(FakeEmbedder):
         return super().embed_text(text)
 
 
+def test_cases_built_for_final_recommendations_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "wanderlens.catalog.case.gather_facts",
+        lambda d, session=None: {"extract": "x", "page_url": "", "wikidata_id": ""},
+    )
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    class CountingWriter:
+        model = "m"
+        prompt_version = "v"
+
+        def __init__(self):
+            self.calls = 0
+
+        def write(self, destination, facts, search_results):
+            self.calls += 1
+            return {"narrative": "case", "sources": []}
+
+    writer = CountingWriter()
+    recs = run_recommend(
+        config, count=2, embedder=FakeEmbedder(), catalog=catalog, case_writer=writer
+    )
+
+    assert recs
+    assert writer.calls == len(recs)
+
+
 class FakeRanker:
     def rank(self, recommendations, profile):
         for rank, rec in enumerate(recommendations, start=1):

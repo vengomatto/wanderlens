@@ -150,6 +150,25 @@ def popularity_label(score: Optional[float]) -> str:
     return "balanced"
 
 
+def percentile_labels(scores: dict[str, float]) -> dict[str, str]:
+    """Label a pool by percentile: top third famous, bottom third uncommon."""
+    values = sorted(scores.values())
+    count = len(values)
+    if count < 3:
+        return {key: popularity_label(value) for key, value in scores.items()}
+    lower = values[count // 3]
+    upper = values[(2 * count) // 3]
+    labels: dict[str, str] = {}
+    for key, value in scores.items():
+        if value >= upper:
+            labels[key] = "famous"
+        elif value <= lower:
+            labels[key] = "uncommon"
+        else:
+            labels[key] = "balanced"
+    return labels
+
+
 def _select(rows: list[tuple], top_k: Optional[int], diversity: float) -> list[tuple]:
     if not rows:
         return []
@@ -215,6 +234,7 @@ def rank_destinations(
     centers = list(visited_centers)
     destinations = list(destinations)
     idf = attribute_idf(destinations) if taste_tags else {}
+    pool_labels = percentile_labels(popularity) if popularity else {}
     scored: list[tuple] = []
     for destination in destinations:
         if destination.country.lower() in excluded:
@@ -302,7 +322,7 @@ def rank_destinations(
             matched_attributes=attributes,
             nearest_trip_km=nearest,
             popularity=pop,
-            popularity_label=popularity_label(pop),
+            popularity_label=pool_labels.get(destination.id) or popularity_label(pop),
         )
         for index, (
             score,

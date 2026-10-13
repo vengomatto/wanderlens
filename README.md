@@ -124,6 +124,11 @@ or any model error falls back to the local, deterministic representation
 
 `eval --synthetic` ranks a reproducible synthetic gallery and reports
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
+`eval --loto` runs **leave-one-trip-out** evaluation over every trip and reports
+**MRR / Recall@10 / Recall@50** (a low baseline with a thin catalog — see
+`docs/eval-baseline.json` and `scripts/eval.sh` for the regression gate), and
+`recommend --diagnose` prints score diagnostics (component spread,
+collapsed-vector share, top-result mix) so a change can be judged.
 
 `wanderlens synthetic --dir <dir>` writes a deterministic **runnable mock
 archive** — six taste clusters, ~300 candidate destinations, tens of trips — and
