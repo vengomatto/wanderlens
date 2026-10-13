@@ -65,3 +65,12 @@ card, from cached data only.
 #### Scenario: Card shows the case
 - **WHEN** a recommendation has a stored case
 - **THEN** the card shows a snippet of it and still links to the full page
+
+### Requirement: Cases built for the shown recommendations
+The system SHALL build a Destination case only for the recommendations that are
+returned, not for the whole candidate shortlist, so model and search work is not
+wasted on places the user never sees.
+
+#### Scenario: Only shown destinations are cased
+- **WHEN** recommendations are generated
+- **THEN** cases are built for the returned Destinations only
