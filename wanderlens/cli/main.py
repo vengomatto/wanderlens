@@ -87,8 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="generate a runnable mock photo archive + catalog for a broad test dataset",
     )
     p_syn.add_argument("--dir", required=True, help="target directory to write the archive into")
-    p_syn.add_argument("--trips-per-taste", type=int, default=8)
-    p_syn.add_argument("--destinations-per-taste", type=int, default=12)
+    p_syn.add_argument("--trips-per-taste", type=int, default=10)
+    p_syn.add_argument("--destinations-per-taste", type=int, default=50)
     p_syn.set_defaults(func=cmd_synthetic)
 
     p_fb = sub.add_parser("feedback", help="record or inspect destination feedback")

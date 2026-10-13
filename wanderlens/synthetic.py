@@ -11,19 +11,28 @@ from PIL import Image
 from wanderlens.catalog.destinations import destination_to_dict
 from wanderlens.core.models import Destination
 
+# Several taste clusters so the catalog is broad and ranking has variety.
+_CLUSTERS: dict[str, dict] = {
+    "coastal": {"lat": 40.0, "lon": 14.0, "color": (40, 110, 180), "attributes": ["coastal", "beach", "water", "boats"]},
+    "mountain": {"lat": 46.4, "lon": 11.7, "color": (70, 110, 60), "attributes": ["mountains", "hiking", "nature", "snow"]},
+    "city": {"lat": 41.9, "lon": 12.5, "color": (150, 120, 90), "attributes": ["city", "architecture", "museum", "food"]},
+    "countryside": {"lat": 43.0, "lon": 11.0, "color": (120, 150, 80), "attributes": ["countryside", "village", "food", "nature"]},
+    "lake": {"lat": 45.5, "lon": 9.5, "color": (60, 140, 160), "attributes": ["lake", "nature", "boats", "mountains"]},
+    "desert": {"lat": 37.0, "lon": -3.0, "color": (200, 170, 110), "attributes": ["desert", "sunset", "nature", "history"]},
+}
+_CLUSTER_ORDER = list(_CLUSTERS)
+_ATTRIBUTES = {name: spec["attributes"] for name, spec in _CLUSTERS.items()}
 _CLUSTER_VECTORS = {
-    "coastal": np.array([1.0, 0.0, 0.0], dtype=np.float32),
-    "mountain": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+    name: np.eye(len(_CLUSTER_ORDER), dtype=np.float32)[index]
+    for index, name in enumerate(_CLUSTER_ORDER)
 }
-
-# Two taste clusters so ranking has something to separate.
-_CLUSTERS = {
-    "coastal": {"lat": 40.0, "lon": 14.0, "color": (40, 110, 180)},
-    "mountain": {"lat": 46.4, "lon": 11.7, "color": (70, 110, 60)},
-}
-_ATTRIBUTES = {
-    "coastal": ["coastal", "beach", "water", "boats"],
-    "mountain": ["mountains", "hiking", "nature", "snow"],
+_KEYWORDS = {
+    "coastal": ("coast", "beach", "water", "boat", "sea"),
+    "mountain": ("mountain", "hiking", "snow", "peak"),
+    "city": ("city", "urban", "architecture", "museum"),
+    "countryside": ("countryside", "village", "rural", "farm"),
+    "lake": ("lake", "fjord", "reservoir"),
+    "desert": ("desert", "dune"),
 }
 
 
@@ -60,8 +69,8 @@ def _write_photo(path: Path, cluster: str, index: int, taken_at: datetime, lat: 
 
 def materialize(
     target_dir: str | Path,
-    trips_per_taste: int = 8,
-    destinations_per_taste: int = 12,
+    trips_per_taste: int = 10,
+    destinations_per_taste: int = 50,
     photos_per_trip: int = 6,
     seed: int = 0,
 ) -> dict:
@@ -83,7 +92,9 @@ def materialize(
     base_date = datetime(2024, 5, 1, 9, 0, 0)
     trip_serial = 0
 
-    for cluster, spec in _CLUSTERS.items():
+    for cluster_index, cluster in enumerate(_CLUSTER_ORDER):
+        spec = _CLUSTERS[cluster]
+        other = _CLUSTER_ORDER[(cluster_index + 1) % len(_CLUSTER_ORDER)]
         for trip_index in range(trips_per_taste):
             trip_count += 1
             lat0 = spec["lat"] + rng.uniform(-0.4, 0.4)
@@ -100,12 +111,10 @@ def materialize(
 
         for dest_index in range(destinations_per_taste):
             match = dest_index < destinations_per_taste // 3
-            attributes = _ATTRIBUTES[cluster] if match else _ATTRIBUTES[
-                "mountain" if cluster == "coastal" else "coastal"
-            ]
+            attributes = _ATTRIBUTES[cluster] if match else _ATTRIBUTES[other]
             destinations.append(
                 Destination(
-                    id=f"syn:{cluster}:{dest_index:02d}",
+                    id=f"syn:{cluster}:{dest_index:03d}",
                     name=f"{cluster.title()} Place {dest_index}",
                     lat=spec["lat"] + rng.uniform(-1.5, 1.5),
                     lon=spec["lon"] + rng.uniform(-1.5, 1.5),
@@ -135,21 +144,22 @@ class SyntheticVision:
 class SyntheticEmbedder:
     """A deterministic cluster-based embedder, so no ONNX runtime is needed."""
 
-    dim = 3
+    dim = len(_CLUSTER_ORDER)
 
     def _cluster(self, path: str) -> str:
         return Path(path).name.split("_")[0]
 
     def embed_image(self, path: str):
-        return _CLUSTER_VECTORS.get(self._cluster(path), np.array([0.0, 0.0, 1.0], dtype=np.float32))
+        return _CLUSTER_VECTORS.get(self._cluster(path), np.zeros(self.dim, dtype=np.float32))
 
     def embed_text(self, text: str):
         lowered = (text or "").lower()
-        if any(word in lowered for word in ("coast", "beach", "water", "boat")):
-            return _CLUSTER_VECTORS["coastal"]
-        if any(word in lowered for word in ("mountain", "hiking", "snow", "nature")):
-            return _CLUSTER_VECTORS["mountain"]
-        return np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        for cluster in _CLUSTER_ORDER:
+            if cluster in lowered:
+                return _CLUSTER_VECTORS[cluster]
+            if any(word in lowered for word in _KEYWORDS[cluster]):
+                return _CLUSTER_VECTORS[cluster]
+        return np.zeros(self.dim, dtype=np.float32)
 
 
 def seed_profile(target_dir: str | Path) -> int:

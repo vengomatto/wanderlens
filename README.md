@@ -118,9 +118,10 @@ or any model error falls back to the local, deterministic representation
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
 
 `wanderlens synthetic --dir <dir>` writes a deterministic **runnable mock
-archive** (photos with EXIF plus a candidate catalog) and profiles it with a
-deterministic vision + embedder, so attribute taste is exercised without a key;
-point `WANDERLENS_DATA_DIR=<dir> WANDERLENS_EMBEDDER=synthetic` at it and run
+archive** — six taste clusters, ~300 candidate destinations, tens of trips — and
+profiles it with a deterministic vision + embedder, so attribute taste is
+exercised without a key; point
+`WANDERLENS_DATA_DIR=<dir> WANDERLENS_EMBEDDER=synthetic` at it and run
 `recommend` to test ranking on a broad dataset instead of a few photos.
 
 **Feedback** biases ranking: `wanderlens feedback --destination <id> --action
