@@ -10,5 +10,9 @@ venv/
 # Wanderlens data (photos, sqlite, caches) — never commit
 data/
 
+# Local config may hold API keys — never commit
+config.yaml
+config.yml
+
 # OS
 .DS_Store
