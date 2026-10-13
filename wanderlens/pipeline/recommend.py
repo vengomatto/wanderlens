@@ -435,7 +435,13 @@ def _explain(conn, user_id, rec, profile, visited_country, explainer) -> str:
 def _default_media_fetcher(conn, recommendations, config) -> int:
     from wanderlens.catalog.media import build_media_chain, fetch_media_for
 
-    chain = build_media_chain(sources=getattr(config, "media_sources", []))
+    chain = build_media_chain(
+        sources=getattr(config, "media_sources", []),
+        keys={
+            "unsplash": getattr(config, "unsplash_key", None),
+            "pexels": getattr(config, "pexels_key", None),
+        },
+    )
     return fetch_media_for(
         conn,
         recommendations,

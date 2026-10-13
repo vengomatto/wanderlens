@@ -141,9 +141,11 @@ from the destination's points of interest (no key needed; the LLM itinerary is
 used when a key is present), **travel diaries/journals**, and a scannable
 description. Images prefer Wikimedia Commons **Quality / Featured / Valued**
 files, and external photo searches (Commons, Getty, Google Images) are linked
-out — proprietary images are never embedded. Opt into extra sources (Openverse)
-with `WANDERLENS_MEDIA_SOURCES=openverse`, and add diary links with
-`WANDERLENS_TRAVEL_BLOGS=url1,url2`.
+out on both the recommendation card and a dedicated **More photos** section —
+proprietary images are never embedded. **Openverse** is enabled as an additional
+source by default; add Unsplash / Pexels by setting `WANDERLENS_UNSPLASH_KEY` /
+`WANDERLENS_PEXELS_KEY` (and listing them in `WANDERLENS_MEDIA_SOURCES`), and add
+diary links with `WANDERLENS_TRAVEL_BLOGS=url1,url2`.
 
 ### Web dashboard
 

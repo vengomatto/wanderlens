@@ -38,9 +38,11 @@ class Config:
     enrich_taste: bool = True
     build_case: bool = True
     travel_blogs: list[str] = field(default_factory=lambda: list(DEFAULT_TRAVEL_BLOGS))
-    media_sources: list[str] = field(default_factory=list)
+    media_sources: list[str] = field(default_factory=lambda: ["openverse"])
     refresh_media: bool = False
     embedder: str = "clip"
+    unsplash_key: Optional[str] = None
+    pexels_key: Optional[str] = None
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -148,13 +150,16 @@ def load_config(
         ),
         media_sources=_string_list(
             values.get("media_sources") or env.get("WANDERLENS_MEDIA_SOURCES")
-        ),
+        )
+        or ["openverse"],
         refresh_media=(
             bool(values.get("refresh_media"))
             if "refresh_media" in values
             else str(env.get("WANDERLENS_REFRESH_MEDIA", "")).lower() in {"1", "true", "yes", "on"}
         ),
         embedder=values.get("embedder") or env.get("WANDERLENS_EMBEDDER") or "clip",
+        unsplash_key=_pick(values.get("unsplash_key"), env.get("WANDERLENS_UNSPLASH_KEY")),
+        pexels_key=_pick(values.get("pexels_key"), env.get("WANDERLENS_PEXELS_KEY")),
     )
 
 

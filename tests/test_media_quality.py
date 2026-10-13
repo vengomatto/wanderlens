@@ -177,3 +177,90 @@ def test_perceptual_dedupe_keeps_one(tmp_path):
 
     stored = conn.execute("SELECT COUNT(*) FROM destination_images").fetchone()[0]
     assert stored == 1
+
+
+class _JsonResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._payload
+
+
+class _JsonSession:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def get(self, url, **kwargs):
+        return _JsonResponse(self._payload)
+
+
+def _dest():
+    return Destination(id="kotor", name="Kotor", lat=42.4, lon=18.7, country="Montenegro")
+
+
+def test_unsplash_provider_parses():
+    from wanderlens.catalog.media import UnsplashMediaProvider
+
+    session = _JsonSession(
+        {
+            "results": [
+                {
+                    "urls": {"regular": "https://u.test/1.jpg"},
+                    "alt_description": "Kotor",
+                    "width": 2000,
+                    "height": 1200,
+                    "user": {"name": "X"},
+                }
+            ]
+        }
+    )
+    images = UnsplashMediaProvider("key", session=session).images(_dest())
+
+    assert images[0]["url"] == "https://u.test/1.jpg"
+    assert images[0]["source"] == "unsplash"
+
+
+def test_pexels_provider_parses():
+    from wanderlens.catalog.media import PexelsMediaProvider
+
+    session = _JsonSession(
+        {
+            "photos": [
+                {
+                    "src": {"large": "https://p.test/1.jpg"},
+                    "alt": "Kotor",
+                    "width": 2000,
+                    "height": 1200,
+                    "photographer": "Y",
+                }
+            ]
+        }
+    )
+    images = PexelsMediaProvider("key", session=session).images(_dest())
+
+    assert images[0]["url"] == "https://p.test/1.jpg"
+    assert images[0]["source"] == "pexels"
+
+
+def test_keyed_sources_require_a_key():
+    from wanderlens.catalog.media import PexelsMediaProvider, UnsplashMediaProvider
+
+    assert UnsplashMediaProvider("", session=_JsonSession({})).images(_dest()) == []
+    assert PexelsMediaProvider("", session=_JsonSession({})).images(_dest()) == []
+
+
+def test_build_media_chain_registers_configured_sources():
+    from wanderlens.catalog.media import build_media_chain
+
+    chain = build_media_chain(
+        sources=["openverse", "unsplash", "pexels"],
+        keys={"unsplash": "k", "pexels": "k"},
+    )
+    assert [p.name for p in chain[0].extra_sources] == ["openverse", "unsplash", "pexels"]
+
+    without_keys = build_media_chain(sources=["unsplash", "pexels"], keys={})
+    assert without_keys[0].extra_sources == []

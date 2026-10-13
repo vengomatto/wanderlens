@@ -86,11 +86,6 @@
       {% for src in detail.case_sources %}<a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.title or src.url }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
     </p>
     {% endif %}
-    {% if detail.external_photo_links %}
-    <p class="muted case-photos">More photos:
-      {% for link in detail.external_photo_links %}<a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
-    </p>
-    {% endif %}
   </section>
   {% endif %}
 
@@ -219,6 +214,18 @@
     <ul class="link-list">
       {% for diary in detail.diaries %}
       <li><a href="{{ diary.url }}" target="_blank" rel="noopener">{{ diary.title or diary.url }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if detail.external_photo_links %}
+  <section class="card photos-card">
+    <h2>More photos</h2>
+    <p class="muted">Browse openly-licensed and stock photography for {{ detail.name }}:</p>
+    <ul class="link-list">
+      {% for link in detail.external_photo_links %}
+      <li><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a></li>
       {% endfor %}
     </ul>
   </section>

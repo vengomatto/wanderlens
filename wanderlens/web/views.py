@@ -98,6 +98,7 @@ class RecView:
     nearest_trip_km: Optional[float] = None
     popularity_label: str = ""
     case_snippet: str = ""
+    photo_links: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -359,6 +360,10 @@ def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView
             nearest_trip_km=row["nearest_trip_km"],
             popularity_label=row["popularity_label"] or "",
             case_snippet=_case_snippet(conn, row["destination_id"]),
+            photo_links=external_photo_links(
+                row["destination_name"] or row["destination_id"],
+                row["destination_country"] or "",
+            ),
         )
         for row in rows
     ]

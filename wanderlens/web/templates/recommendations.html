@@ -37,6 +37,7 @@
         {% if rec.description %}<p class="desc">{{ rec.description }}</p>{% endif %}
         {% if rec.case_snippet %}<p class="case-snippet">{{ rec.case_snippet }} <a href="/destinations/{{ rec.destination_id | urlencode }}">Read more →</a></p>{% endif %}
         {% if rec.explanation %}<p class="why">{{ rec.explanation }}</p>{% endif %}
+        {% if rec.photo_links %}<p class="muted rec-photos">Photos: {% for link in rec.photo_links %}<a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
         <div class="scores">
           {% if rec.embedding_score is not none %}<span class="score-part">emb {{ "%.3f" | format(rec.embedding_score) }}</span>{% endif %}
           {% if rec.attribute_score is not none %}<span class="score-part">attr {{ "%.3f" | format(rec.attribute_score) }}</span>{% endif %}

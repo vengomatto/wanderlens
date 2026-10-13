@@ -158,6 +158,107 @@ class OpenverseMediaProvider:
         return images
 
 
+class UnsplashMediaProvider:
+    """Additional free, commercial-use images from the Unsplash API (needs a key)."""
+
+    name = "unsplash"
+    API = "https://api.unsplash.com/search/photos"
+
+    def __init__(self, access_key, session=None, timeout: int = 30, per_page: int = 20):
+        self.access_key = access_key
+        self.session = session
+        self.timeout = timeout
+        self.per_page = per_page
+
+    def images(self, destination: Destination) -> list[dict]:
+        import requests
+
+        from wanderlens.catalog.fetch import USER_AGENT
+
+        if not self.access_key:
+            return []
+        response = (self.session or requests).get(
+            self.API,
+            params={
+                "query": f"{destination.name} {destination.country}".strip(),
+                "per_page": self.per_page,
+                "orientation": "landscape",
+            },
+            headers={"Authorization": f"Client-ID {self.access_key}", "User-Agent": USER_AGENT},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        images: list[dict] = []
+        for item in response.json().get("results", []):
+            url = (item.get("urls") or {}).get("regular")
+            if not url:
+                continue
+            images.append(
+                {
+                    "title": item.get("alt_description") or item.get("description") or "",
+                    "url": url,
+                    "width": int(item.get("width") or 0),
+                    "height": int(item.get("height") or 0),
+                    "mime": "image/jpeg",
+                    "license": "Unsplash License",
+                    "attribution": (item.get("user") or {}).get("name", ""),
+                    "source": "unsplash",
+                }
+            )
+        return images
+
+
+class PexelsMediaProvider:
+    """Additional free, commercial-use images from the Pexels API (needs a key)."""
+
+    name = "pexels"
+    API = "https://api.pexels.com/v1/search"
+
+    def __init__(self, api_key, session=None, timeout: int = 30, per_page: int = 20):
+        self.api_key = api_key
+        self.session = session
+        self.timeout = timeout
+        self.per_page = per_page
+
+    def images(self, destination: Destination) -> list[dict]:
+        import requests
+
+        from wanderlens.catalog.fetch import USER_AGENT
+
+        if not self.api_key:
+            return []
+        response = (self.session or requests).get(
+            self.API,
+            params={
+                "query": f"{destination.name} {destination.country}".strip(),
+                "per_page": self.per_page,
+                "orientation": "landscape",
+            },
+            headers={"Authorization": self.api_key, "User-Agent": USER_AGENT},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        images: list[dict] = []
+        for item in response.json().get("photos", []):
+            src = item.get("src") or {}
+            url = src.get("large") or src.get("original")
+            if not url:
+                continue
+            images.append(
+                {
+                    "title": item.get("alt") or "",
+                    "url": url,
+                    "width": int(item.get("width") or 0),
+                    "height": int(item.get("height") or 0),
+                    "mime": "image/jpeg",
+                    "license": "Pexels License",
+                    "attribution": item.get("photographer", ""),
+                    "source": "pexels",
+                }
+            )
+        return images
+
+
 class WikimediaMediaProvider:
     """Travel-oriented description (Wikivoyage) + Wikipedia hero + Commons gallery."""
 
@@ -295,11 +396,16 @@ class CommonsMediaProvider:
         )
 
 
-def build_media_chain(session=None, sources=None) -> list:
+def build_media_chain(session=None, sources=None, keys=None) -> list:
+    keys = keys or {}
     extra = []
     for name in sources or []:
         if name == "openverse":
             extra.append(OpenverseMediaProvider(session=session))
+        elif name == "unsplash" and keys.get("unsplash"):
+            extra.append(UnsplashMediaProvider(keys["unsplash"], session=session))
+        elif name == "pexels" and keys.get("pexels"):
+            extra.append(PexelsMediaProvider(keys["pexels"], session=session))
     return [WikimediaMediaProvider(session=session, extra_sources=extra), CommonsMediaProvider(session=session)]
 
 

@@ -335,3 +335,17 @@ def test_recommendations_include_case_snippet(tmp_path):
     by_id = {rec.destination_id: rec for rec in recs}
     assert "compelling" in by_id["wy:algarve"].case_snippet
 
+
+def test_recommendations_carry_photo_links(tmp_path):
+    conn = _seed(tmp_path)
+    recs = views.recommendations_view(conn, 1)
+    labels = {link["label"] for rec in recs for link in rec.photo_links}
+    assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
+
+
+def test_destination_detail_has_photo_links(tmp_path):
+    conn = _seed(tmp_path)
+    detail = views.destination_detail(conn, 1, "wy:algarve")
+    labels = {link["label"] for link in detail.external_photo_links}
+    assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
+
