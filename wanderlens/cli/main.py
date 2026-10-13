@@ -53,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="synthesise the 'why' with the LLM (needs an API key); cached",
     )
+    p_rec.add_argument(
+        "--diversity",
+        type=float,
+        default=0.25,
+        help="MMR diversity weight (0 = pure relevance, 1 = max variety)",
+    )
+    p_rec.add_argument(
+        "--novelty",
+        choices=["familiar", "balanced", "uncommon"],
+        default="balanced",
+        help="bias selection toward famous or uncommon places",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -124,6 +136,9 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         alpha=args.alpha,
         media=not args.no_media,
         explainer=explainer,
+        diversity=args.diversity,
+        novelty=args.novelty,
+        popularity=True,
     )
     if not recs:
         print("No recommendations.")

@@ -40,10 +40,10 @@ def _seed(tmp_path):
         "INSERT INTO recommendations "
         "(user_id, run_id, rank, destination_id, score, explanation, destination_name, "
         " destination_country, destination_lat, destination_lon, destination_description, "
-        " embedding_score, attribute_score, matched_attributes, best_trip_label, nearest_trip_km) "
+        " embedding_score, attribute_score, matched_attributes, best_trip_label, nearest_trip_km, popularity_label) "
         "VALUES (1, 1, 1, 'wy:algarve', 0.83, 'fits your taste for coastal', 'Algarve', "
         " 'Portugal', 37.0, -8.0, 'A sun-drenched coast.', 0.7, 0.42, "
-        " '{\"coastal\": 0.6, \"water\": 0.2}', 'Valletta, Malta', 500.0)"
+        " '{\"coastal\": 0.6, \"water\": 0.2}', 'Valletta, Malta', 500.0, 'famous')"
     )
     conn.execute(
         "INSERT INTO destination_media "
@@ -207,6 +207,7 @@ def test_recommendation_view_carries_evidence(tmp_path):
     assert ("coastal", 0.6) in rec.matched_attributes
     assert rec.matched_attributes[0][0] == "coastal"  # sorted by weight
     assert rec.nearest_trip_km == 500.0
+    assert rec.popularity_label == "famous"
 
 
 def test_destination_detail_with_media(tmp_path):

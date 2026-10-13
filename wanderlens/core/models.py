@@ -51,6 +51,8 @@ class Recommendation:
     best_facet_similarity: Optional[float] = None
     matched_attributes: dict[str, float] = field(default_factory=dict)
     nearest_trip_km: Optional[float] = None
+    popularity: Optional[float] = None
+    popularity_label: str = ""
 
 
 @dataclass

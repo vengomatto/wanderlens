@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS recommendations (
     best_trip_label         TEXT,
     best_facet_similarity   REAL,
     nearest_trip_km         REAL,
+    popularity              REAL,
+    popularity_label        TEXT,
     PRIMARY KEY (user_id, run_id, rank)
 );
 
@@ -128,6 +130,13 @@ CREATE TABLE IF NOT EXISTS destination_images (
     license         TEXT,
     attribution     TEXT,
     PRIMARY KEY (destination_id, position)
+);
+
+CREATE TABLE IF NOT EXISTS destination_popularity (
+    destination_id  TEXT PRIMARY KEY,
+    pageviews       INTEGER,
+    score           REAL,
+    fetched_at      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS destination_guide (
@@ -193,6 +202,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("best_trip_label", "TEXT"),
         ("best_facet_similarity", "REAL"),
         ("nearest_trip_km", "REAL"),
+        ("popularity", "REAL"),
+        ("popularity_label", "TEXT"),
     ):
         if column not in rec_columns:
             conn.execute(f"ALTER TABLE recommendations ADD COLUMN {column} {declaration}")

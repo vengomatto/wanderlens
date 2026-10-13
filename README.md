@@ -95,6 +95,11 @@ often they recur), and how new it is (distance from your nearest visit). Add
 prose; the text is cached per evidence, so reruns are reproducible and the
 deterministic explanation is always the fallback.
 
+Results are **diversified** (Maximal Marginal Relevance) so the list is not eight
+variations of one vibe, and each carries a **famous / balanced / uncommon** label
+from Wikipedia pageviews. Tune with `recommend --diversity 0.25` and
+`recommend --novelty {familiar|balanced|uncommon}`.
+
 ### Web dashboard
 
 A local, read-only dashboard over the same data (FastAPI + Jinja + HTMX + a

@@ -183,6 +183,10 @@ def run_recommend(
     media: bool = False,
     media_fetcher=None,
     explainer=None,
+    diversity: float = 0.0,
+    novelty: str = "balanced",
+    popularity: bool = False,
+    popularity_fetcher=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -214,16 +218,42 @@ def run_recommend(
     candidates = filter_unvisited_proximity(candidates, centers, radius)
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     profile = load_profile(conn, user_id, embedding=taste)
-    recommendations = rank_destinations(
+    tags = taste_attribute_weights(profile.tags)
+
+    shortlist_size = min(len(candidates), max(count * 4, 20))
+    shortlist = rank_destinations(
         taste,
         candidates,
         embedder.embed_text,
-        top_k=count,
+        top_k=shortlist_size,
         vectors=vectors,
-        taste_tags=taste_attribute_weights(profile.tags),
+        taste_tags=tags,
         alpha=alpha,
         taste_facets=facets,
         visited_centers=centers,
+    )
+
+    popularity_scores: dict[str, float] = {}
+    if popularity:
+        fetcher = popularity_fetcher or _default_popularity_fetcher
+        try:
+            popularity_scores = fetcher(conn, [rec.destination for rec in shortlist]) or {}
+        except Exception:
+            popularity_scores = {}
+
+    recommendations = rank_destinations(
+        taste,
+        [rec.destination for rec in shortlist],
+        embedder.embed_text,
+        top_k=count,
+        vectors=vectors,
+        taste_tags=tags,
+        alpha=alpha,
+        taste_facets=facets,
+        visited_centers=centers,
+        diversity=diversity,
+        novelty=novelty,
+        popularity=popularity_scores,
     )
 
     visited_country = (
@@ -246,8 +276,8 @@ def run_recommend(
             " destination_name, destination_country, destination_lat, destination_lon, "
             " destination_description, embedding_score, attribute_score, "
             " matched_attributes, best_trip_id, best_trip_label, best_facet_similarity, "
-            " nearest_trip_km) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " nearest_trip_km, popularity, popularity_label) "
+            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 rec.rank,
@@ -266,6 +296,8 @@ def run_recommend(
                 rec.best_trip_label,
                 rec.best_facet_similarity,
                 rec.nearest_trip_km,
+                rec.popularity,
+                rec.popularity_label,
             ),
         )
     conn.commit()
@@ -350,3 +382,9 @@ def _default_media_fetcher(conn, recommendations, config) -> int:
     from wanderlens.catalog.media import fetch_media_for
 
     return fetch_media_for(conn, recommendations, config.data_dir / "media")
+
+
+def _default_popularity_fetcher(conn, destinations) -> dict:
+    from wanderlens.catalog.popularity import fetch_popularity_for
+
+    return fetch_popularity_for(conn, destinations)

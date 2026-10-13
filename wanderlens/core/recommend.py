@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Callable, Iterable, Optional
 
 import numpy as np
@@ -95,6 +96,60 @@ def _as_facets(taste_facets) -> list[Facet]:
     return facets
 
 
+def _cosine(a, b) -> float:
+    if a is None or b is None:
+        return 0.0
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
+    if not na or not nb:
+        return 0.0
+    return float(np.dot(a, b)) / (na * nb)
+
+
+def normalize_popularity(total: Optional[float]) -> Optional[float]:
+    if total is None:
+        return None
+    return min(1.0, max(0.0, math.log10(total + 1) / 6.0))
+
+
+def popularity_label(score: Optional[float]) -> str:
+    if score is None:
+        return ""
+    if score >= 0.66:
+        return "famous"
+    if score <= 0.33:
+        return "uncommon"
+    return "balanced"
+
+
+def _select(rows: list[tuple], top_k: Optional[int], diversity: float) -> list[tuple]:
+    if not rows:
+        return []
+    ordered = sorted(rows, key=lambda row: (-row[0], row[3].name))
+    if not diversity or top_k is None:
+        return ordered[:top_k] if top_k is not None else ordered
+
+    remaining = list(ordered)
+    selected = [remaining.pop(0)]
+    while remaining and len(selected) < top_k:
+        best_index = 0
+        best_value = None
+        for index, row in enumerate(remaining):
+            similarity = max(
+                (_cosine(row[-1], chosen[-1]) for chosen in selected), default=0.0
+            )
+            value = row[0] - diversity * similarity
+            if (
+                best_value is None
+                or value > best_value
+                or (value == best_value and row[3].name < remaining[best_index][3].name)
+            ):
+                best_value = value
+                best_index = index
+        selected.append(remaining.pop(best_index))
+    return selected
+
+
 def rank_destinations(
     taste: Optional[np.ndarray],
     destinations: Iterable[Destination],
@@ -106,6 +161,10 @@ def rank_destinations(
     alpha: float = 0.5,
     taste_facets: Optional[list] = None,
     visited_centers: Iterable[tuple[float, float]] = (),
+    diversity: float = 0.0,
+    novelty: str = "balanced",
+    popularity: Optional[dict[str, float]] = None,
+    novelty_weight: float = 0.15,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -154,6 +213,11 @@ def rank_destinations(
             attribute_score = None
             score = embedding_score
 
+        pop = popularity.get(destination.id) if popularity else None
+        if pop is not None and novelty in {"familiar", "uncommon"}:
+            delta = pop - 0.5
+            score += novelty_weight * delta * (1 if novelty == "familiar" else -1)
+
         scored.append(
             (
                 score,
@@ -165,11 +229,12 @@ def rank_destinations(
                 best_facet_similarity,
                 attributes,
                 nearest_visited_km(destination, centers),
+                pop,
+                vector,
             )
         )
-    scored.sort(key=lambda row: (-row[0], row[3].name))
 
-    ranked = scored[:top_k] if top_k is not None else scored
+    ranked = _select(scored, top_k, diversity)
     return [
         Recommendation(
             destination=destination,
@@ -182,6 +247,8 @@ def rank_destinations(
             best_facet_similarity=best_facet_similarity,
             matched_attributes=attributes,
             nearest_trip_km=nearest,
+            popularity=pop,
+            popularity_label=popularity_label(pop),
         )
         for index, (
             score,
@@ -193,6 +260,8 @@ def rank_destinations(
             best_facet_similarity,
             attributes,
             nearest,
+            pop,
+            vector,
         ) in enumerate(ranked, start=1)
     ]
 

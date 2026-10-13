@@ -52,6 +52,7 @@ class RecView:
     matched_attributes: list[tuple[str, float]] = field(default_factory=list)
     best_trip_label: str = ""
     nearest_trip_km: Optional[float] = None
+    popularity_label: str = ""
 
 
 @dataclass
@@ -96,6 +97,7 @@ class DestinationDetail:
     matched_attributes: list[tuple[str, float]] = field(default_factory=list)
     best_trip_label: str = ""
     nearest_trip_km: Optional[float] = None
+    popularity_label: str = ""
     understand: str = ""
     links: list[dict] = field(default_factory=list)
     books: list[dict] = field(default_factory=list)
@@ -279,7 +281,7 @@ def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView
         "SELECT rank, destination_id, destination_name, destination_country, "
         "destination_lat, destination_lon, destination_description, score, "
         "explanation, embedding_score, attribute_score, matched_attributes, "
-        "best_trip_label, nearest_trip_km "
+        "best_trip_label, nearest_trip_km, popularity_label "
         "FROM recommendations WHERE user_id = ? ORDER BY rank",
         (user_id,),
     ).fetchall()
@@ -302,6 +304,7 @@ def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView
             matched_attributes=_matched_attributes(row["matched_attributes"]),
             best_trip_label=row["best_trip_label"] or "",
             nearest_trip_km=row["nearest_trip_km"],
+            popularity_label=row["popularity_label"] or "",
         )
         for row in rows
     ]
@@ -326,7 +329,7 @@ def destination_detail(
     rec = conn.execute(
         "SELECT destination_name, destination_country, destination_lat, destination_lon, "
         "destination_description, score, explanation, embedding_score, attribute_score, "
-        "matched_attributes, best_trip_label, nearest_trip_km "
+        "matched_attributes, best_trip_label, nearest_trip_km, popularity_label "
         "FROM recommendations WHERE user_id = ? AND destination_id = ? "
         "ORDER BY run_id DESC, rank LIMIT 1",
         (user_id, destination_id),
@@ -400,6 +403,7 @@ def destination_detail(
         matched_attributes=_matched_attributes(rec["matched_attributes"]) if rec else [],
         best_trip_label=(rec["best_trip_label"] if rec else "") or "",
         nearest_trip_km=rec["nearest_trip_km"] if rec else None,
+        popularity_label=(rec["popularity_label"] if rec else "") or "",
         understand=(guide["understand"] if guide else "") or "",
         links=_json_list(guide["links"]) if guide else [],
         books=_json_list(guide["books"]) if guide else [],

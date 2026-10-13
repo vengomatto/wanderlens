@@ -138,6 +138,45 @@ def test_rank_tracks_closest_trip_and_attributes():
     assert rec.nearest_trip_km is not None
 
 
+def test_mmr_diversifies_near_duplicates():
+    p = Destination(id="p", name="P", lat=1, lon=1, country="X")
+    q = Destination(id="q", name="Q", lat=1, lon=1, country="X")
+    r = Destination(id="r", name="R", lat=1, lon=1, country="X")
+    vectors = {
+        "p": np.array([0.9, 0.44, 0.0], dtype=np.float32),
+        "q": np.array([0.9, 0.43, 0.0], dtype=np.float32),  # near-duplicate of p
+        "r": np.array([0.0, 1.0, 0.0], dtype=np.float32),  # dissimilar
+    }
+    taste = np.array([1.0, 1.0, 0.0], dtype=np.float32)
+
+    plain = rank_destinations(taste, [p, q, r], vectors=vectors, top_k=2)
+    varied = rank_destinations(taste, [p, q, r], vectors=vectors, top_k=2, diversity=0.9)
+
+    assert [x.destination.id for x in plain] == ["p", "q"]
+    assert [x.destination.id for x in varied] == ["p", "r"]
+
+
+def test_novelty_preference_biases_selection():
+    a = Destination(id="a", name="A", lat=1, lon=1, country="X")
+    b = Destination(id="b", name="B", lat=1, lon=1, country="X")
+    vectors = {
+        "a": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        "b": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+    }
+    taste = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    popularity = {"a": 0.9, "b": 0.1}
+
+    familiar = rank_destinations(
+        taste, [a, b], vectors=vectors, top_k=1, novelty="familiar", popularity=popularity
+    )
+    uncommon = rank_destinations(
+        taste, [a, b], vectors=vectors, top_k=1, novelty="uncommon", popularity=popularity
+    )
+
+    assert familiar[0].destination.id == "a"
+    assert uncommon[0].destination.id == "b"
+
+
 def test_ranking_order_unchanged_by_facet_identity():
     from wanderlens.core.models import Facet
 
@@ -398,3 +437,36 @@ def test_synthesis_failure_falls_back(tmp_path):
 
     assert recs
     assert recs[0].explanation
+
+
+def test_run_recommend_persists_popularity(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    run_recommend(
+        config,
+        embedder=FakeEmbedder(),
+        catalog=catalog,
+        popularity=True,
+        popularity_fetcher=lambda conn, dests: {d.id: 0.8 for d in dests},
+    )
+
+    row = sqlite3.connect(config.db_path).execute(
+        "SELECT popularity, popularity_label FROM recommendations WHERE rank = 1"
+    ).fetchone()
+    assert row[0] == 0.8
+    assert row[1] == "famous"
+
+
+def test_run_recommend_survives_popularity_error(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    def boom(conn, dests):
+        raise RuntimeError("pageviews unavailable")
+
+    recs = run_recommend(
+        config, embedder=FakeEmbedder(), catalog=catalog, popularity=True, popularity_fetcher=boom
+    )
+
+    assert recs

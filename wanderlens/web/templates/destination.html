@@ -17,6 +17,7 @@
       <p class="sub">{% if detail.images and detail.images[0].attribution %}Photo: {{ detail.images[0].attribution }}{% if detail.images[0].license %} · {{ detail.images[0].license }}{% endif %}{% endif %}</p>
       <div class="dest-hero-meta">
         {% if detail.country %}<span>{{ detail.country }}</span>{% endif %}
+        {% if detail.popularity_label %}<span>{{ detail.popularity_label }}</span>{% endif %}
         {% if detail.region_kind %}<span>{{ detail.region_kind }} area</span>{% endif %}
         {% if detail.images %}<span>{{ detail.images | length }} photos</span>{% endif %}
         {% if detail.pois %}<span>{{ detail.pois | length }} places to see</span>{% endif %}
