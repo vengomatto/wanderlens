@@ -1,3 +1,4 @@
+import inspect
 import sqlite3
 
 import numpy as np
@@ -6,12 +7,13 @@ from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.config import Config
 from wanderlens.core.models import Destination
 from wanderlens.core.recommend import (
+    destination_text,
     rank_destinations,
     taste_attribute_weights,
     taste_embedding,
 )
 from wanderlens.db import connect, init_db
-from wanderlens.pipeline.recommend import run_recommend
+from wanderlens.pipeline.recommend import load_taste_facets, run_recommend
 
 
 def _embed_text(text):
@@ -470,3 +472,107 @@ def test_run_recommend_survives_popularity_error(tmp_path):
     )
 
     assert recs
+
+
+def test_default_alpha_is_calibrated():
+    assert inspect.signature(rank_destinations).parameters["alpha"].default == 0.25
+
+
+def test_rare_attribute_outranks_generic():
+    def embed_text(text):
+        return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    taste = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    rare = Destination(
+        id="rare", name="Glacier Bay", lat=1, lon=1, country="X", description="a glacier valley"
+    )
+    generic = Destination(
+        id="generic", name="Coast Town", lat=1, lon=1, country="Y", description="a coastal town"
+    )
+    fillers = [
+        Destination(
+            id=f"c{i}", name=f"Coast{i}", lat=1, lon=1, country="Z", description="a coastal town"
+        )
+        for i in range(6)
+    ]
+    tags = taste_attribute_weights({"coastal": 1.0, "snow": 1.0})
+
+    ranked = rank_destinations(
+        taste, [generic, rare, *fillers], embed_text, taste_tags=tags
+    )
+
+    assert ranked[0].destination.id == "rare"
+
+
+def test_closer_embedding_ranks_higher():
+    a = Destination(id="a", name="A", lat=1, lon=1, country="X")
+    b = Destination(id="b", name="B", lat=1, lon=1, country="X")
+    vectors = {
+        "a": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        "b": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+    }
+    taste = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    ranked = rank_destinations(
+        taste, [b, a], vectors=vectors, taste_tags=taste_attribute_weights({"coastal": 1.0})
+    )
+
+    assert ranked[0].destination.id == "a"
+
+
+def test_destination_attributes_drive_embedding_ranking():
+    def embed_text(text):
+        return np.array([1.0, 0.0] if "coastal" in text.lower() else [0.0, 1.0], dtype=np.float32)
+
+    taste = np.array([1.0, 0.0], dtype=np.float32)
+    with_attribute = Destination(id="a", name="Alpha", lat=1, lon=1, country="G", attributes=["coastal"])
+    without = Destination(id="b", name="Beta", lat=1, lon=1, country="G")
+
+    ranked = rank_destinations(taste, [without, with_attribute], embed_text)
+
+    assert "coastal" in destination_text(with_attribute)
+    assert ranked[0].destination.id == "a"
+
+
+def test_thin_trip_facet_is_down_weighted(tmp_path):
+    config = _seed(tmp_path)
+    conn = connect(config.db_path)
+    conn.execute(
+        "INSERT INTO trips (user_id, id, start_at, end_at, country, city, lat, lon) "
+        "VALUES (1, 1, NULL, NULL, 'Greece', 'Athens', 37.98, 23.72)"
+    )
+    for i in range(4):
+        conn.execute(
+            "INSERT INTO photo_embeddings (user_id, photo_id, dim, vector) VALUES (1, ?, 3, ?)",
+            (f"g{i}", np.array([0.0, 1.0, 0.0], dtype=np.float32).tobytes()),
+        )
+        conn.execute(
+            "INSERT INTO trip_photos (user_id, trip_id, photo_id) VALUES (1, 1, ?)", (f"g{i}",)
+        )
+    conn.commit()
+
+    facets = load_taste_facets(conn, 1, min_photos=4)
+    weights = {facet.trip_id: facet.weight for facet in facets}
+
+    assert weights[1] == 1.0, "four-photo trip keeps full weight"
+    assert weights[0] == 0.75, "three-photo trip is down-weighted"
+
+
+def test_run_recommend_survives_enricher_error(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    class Boom:
+        model = "boom"
+        prompt_version = "v1"
+
+        def attribute_trip(self, tags, context=""):
+            raise RuntimeError("no")
+
+        def description(self, destination):
+            raise RuntimeError("no")
+
+    recs = run_recommend(config, embedder=FakeEmbedder(), catalog=catalog, enricher=Boom())
+
+    assert recs
+

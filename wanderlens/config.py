@@ -26,6 +26,11 @@ class Config:
     tile_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     tile_attribution: str = "&copy; OpenStreetMap contributors"
     explain_llm: bool = False
+    split_gap_hours: float = 18.0
+    split_jump_km: float = 150.0
+    facet_min_photos: int = 4
+    alpha: float = 0.25
+    enrich_taste: bool = True
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -107,4 +112,19 @@ def load_config(
         or "&copy; OpenStreetMap contributors",
         explain_llm=bool(values.get("explain_llm"))
         or str(env.get("WANDERLENS_EXPLAIN_LLM", "")).lower() in {"1", "true", "yes", "on"},
+        split_gap_hours=float(
+            values.get("split_gap_hours") or env.get("WANDERLENS_SPLIT_GAP_HOURS") or 18.0
+        ),
+        split_jump_km=float(
+            values.get("split_jump_km") or env.get("WANDERLENS_SPLIT_JUMP_KM") or 150.0
+        ),
+        facet_min_photos=int(
+            values.get("facet_min_photos") or env.get("WANDERLENS_FACET_MIN_PHOTOS") or 4
+        ),
+        alpha=float(values.get("alpha") or env.get("WANDERLENS_ALPHA") or 0.25),
+        enrich_taste=(
+            bool(values.get("enrich_taste"))
+            if "enrich_taste" in values
+            else str(env.get("WANDERLENS_ENRICH_TASTE", "1")).lower() in {"1", "true", "yes", "on"}
+        ),
     )

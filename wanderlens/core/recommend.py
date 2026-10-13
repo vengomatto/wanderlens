@@ -58,6 +58,33 @@ def matched_attributes(
     }
 
 
+def attribute_idf(destinations: Iterable[Destination]) -> dict[str, float]:
+    """Specificity of each canonical attribute across the candidate catalog.
+
+    A smoothed inverse-document-frequency term, normalized to mean 1, so a rare,
+    descriptive attribute counts for more than one that appears everywhere.
+    Deterministic for a given catalog.
+    """
+    attribute_sets = [destination_attribute_set(destination) for destination in destinations]
+    count = len(attribute_sets)
+    if not count:
+        return {}
+    document_frequency: dict[str, int] = {}
+    for attributes in attribute_sets:
+        for attribute in attributes:
+            document_frequency[attribute] = document_frequency.get(attribute, 0) + 1
+    raw = {
+        attribute: math.log((count + 1) / (frequency + 1)) + 1.0
+        for attribute, frequency in document_frequency.items()
+    }
+    if not raw:
+        return {}
+    mean = sum(raw.values()) / len(raw)
+    if not mean:
+        return raw
+    return {attribute: value / mean for attribute, value in raw.items()}
+
+
 def nearest_visited_km(
     destination: Destination, centers: Iterable[tuple[float, float]]
 ) -> Optional[float]:
@@ -158,7 +185,7 @@ def rank_destinations(
     top_k: Optional[int] = None,
     vectors: Optional[dict] = None,
     taste_tags: Optional[dict[str, float]] = None,
-    alpha: float = 0.5,
+    alpha: float = 0.25,
     taste_facets: Optional[list] = None,
     visited_centers: Iterable[tuple[float, float]] = (),
     diversity: float = 0.0,
@@ -179,6 +206,8 @@ def rank_destinations(
     excluded = {c.lower() for c in exclude_countries}
     facets = _as_facets(taste_facets)
     centers = list(visited_centers)
+    destinations = list(destinations)
+    idf = attribute_idf(destinations) if taste_tags else {}
     scored: list[tuple] = []
     for destination in destinations:
         if destination.country.lower() in excluded:
@@ -194,7 +223,10 @@ def rank_destinations(
         best_trip_label = ""
         best_facet_similarity: Optional[float] = None
         if facets:
-            similarities = [(float(np.dot(facet.vector, vector)), facet) for facet in facets]
+            similarities = [
+                (float(np.dot(facet.vector, vector)) * getattr(facet, "weight", 1.0), facet)
+                for facet in facets
+            ]
             embedding_score, best = max(similarities, key=lambda item: item[0])
             best_trip_id = best.trip_id
             best_trip_label = best.label
@@ -206,7 +238,10 @@ def rank_destinations(
 
         if taste_tags:
             attributes = matched_attributes(taste_tags, destination)
-            attribute_score = sum(attributes.values())
+            attribute_score = sum(
+                weight * idf.get(attribute, 1.0)
+                for attribute, weight in attributes.items()
+            )
             score = alpha * embedding_score + (1.0 - alpha) * attribute_score
         else:
             attributes = {}

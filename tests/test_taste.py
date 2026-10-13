@@ -56,3 +56,23 @@ def test_geography_weights_normalized():
     trips = to_trips(cluster_into_trips(p), reverse_geocoder=lambda lat, lon: ("Levanto", "Italy"))
     weights = geography_weights(trips)
     assert weights == {"Italy": 1.0}
+
+
+def test_default_split_thresholds_unchanged():
+    base = datetime(2025, 12, 29, 10, 0, 0)
+    photos = [_photo(1, base), _photo(2, base + timedelta(hours=24))]
+    assert len(cluster_into_trips(photos)) == 2, "default 18h gap splits"
+
+
+def test_configurable_split_window_merges():
+    base = datetime(2025, 12, 29, 10, 0, 0)
+    photos = [_photo(1, base), _photo(2, base + timedelta(hours=24))]
+    merged = cluster_into_trips(photos, max_gap=timedelta(hours=48))
+    assert len(merged) == 1
+
+
+def test_configurable_spatial_jump():
+    base = datetime(2025, 12, 29, 10, 0, 0)
+    photos = [_photo(1, base, 44.18, 9.58), _photo(2, base + timedelta(hours=1), 35.90, 14.51)]
+    assert len(cluster_into_trips(photos, max_jump_km=2000)) == 1
+

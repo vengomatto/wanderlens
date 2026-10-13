@@ -5,7 +5,8 @@ from typing import Optional
 
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.catalog.fetch import country_code_for_name
-from wanderlens.core.evaluate import evaluate_resurfacing
+from wanderlens.core.evaluate import evaluate_resurfacing, mrr, precision_at_k
+from wanderlens.core.gallery import build_gallery
 from wanderlens.core.recommend import (
     filter_unvisited_proximity,
     rank_destinations,
@@ -142,3 +143,25 @@ def run_eval(
     )
     result = evaluate_resurfacing(ranked, (hold["lat"], hold["lon"]), radius, within_top, label)
     return result.describe()
+
+
+def run_synthetic_eval(k: int = 3, alpha: Optional[float] = None) -> str:
+    """Rank the synthetic gallery and report precision@k / MRR.
+
+    A reproducible quality signal that does not depend on the user's archive, so
+    ranking changes can be compared without more real data.
+    """
+    gallery = build_gallery()
+    ranked = rank_destinations(
+        None,
+        gallery.destinations,
+        vectors=gallery.vectors,
+        taste_tags=gallery.taste_tags,
+        taste_facets=gallery.facets,
+        alpha=0.25 if alpha is None else alpha,
+        top_k=None,
+    )
+    ids = [rec.destination.id for rec in ranked]
+    precision = precision_at_k(ids, gallery.relevant, k)
+    reciprocal = mrr(ids, gallery.relevant)
+    return f"Synthetic gallery (n={len(ids)}): precision@{k} = {precision:.2f}, MRR = {reciprocal:.2f}"

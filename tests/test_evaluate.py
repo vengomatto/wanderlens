@@ -2,10 +2,10 @@ import numpy as np
 
 from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.config import Config
-from wanderlens.core.evaluate import evaluate_holdout, evaluate_resurfacing
+from wanderlens.core.evaluate import evaluate_holdout, evaluate_resurfacing, mrr, precision_at_k
 from wanderlens.core.models import Destination, Recommendation
 from wanderlens.db import connect, init_db
-from wanderlens.pipeline.evaluate import run_eval
+from wanderlens.pipeline.evaluate import run_eval, run_synthetic_eval
 
 
 def test_evaluate_holdout_reports_rank():
@@ -111,3 +111,26 @@ def test_run_eval_rejects_non_visited_holdout(tmp_path):
     config = _seed(tmp_path)
     text = run_eval(config, holdout="France", embedder=FakeEmbedder(), catalog=JsonCatalog(DESTINATIONS), providers=[FakeProvider()])
     assert "not a visited trip" in text
+
+
+def test_precision_at_k_perfect_partial_and_empty():
+    assert precision_at_k(["a", "b", "c"], {"a", "b"}, 2) == 1.0
+    assert abs(precision_at_k(["a", "x", "b"], {"a", "b"}, 3) - 2 / 3) < 1e-9
+    assert precision_at_k(["x", "y"], {"a"}, 2) == 0.0
+    assert precision_at_k(["a"], set(), 1) == 0.0
+
+
+def test_mrr_values():
+    assert mrr(["a"], {"a"}) == 1.0
+    assert mrr(["x", "a"], {"a"}) == 0.5
+    assert mrr(["x", "y"], {"a"}) == 0.0
+    assert mrr(["a"], set()) == 0.0
+
+
+def test_synthetic_eval_reports_metrics():
+    text = run_synthetic_eval(k=3)
+    assert "precision@3" in text
+    assert "MRR" in text
+    assert "precision@3 = 1.00" in text, text
+    assert "MRR = 1.00" in text, text
+

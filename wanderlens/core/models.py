@@ -62,6 +62,7 @@ class Facet:
     trip_id: Optional[int]
     label: str
     vector: object
+    weight: float = 1.0
 
 
 @dataclass

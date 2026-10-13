@@ -139,6 +139,18 @@ CREATE TABLE IF NOT EXISTS destination_popularity (
     fetched_at      TEXT
 );
 
+CREATE TABLE IF NOT EXISTS taste_enrichment (
+    user_id         INTEGER NOT NULL,
+    kind            TEXT    NOT NULL,
+    ref_id          TEXT    NOT NULL,
+    input_hash      TEXT    NOT NULL,
+    model           TEXT,
+    prompt_version  TEXT,
+    result          TEXT    NOT NULL,
+    created_at      TEXT,
+    PRIMARY KEY (user_id, kind, ref_id, input_hash)
+);
+
 CREATE TABLE IF NOT EXISTS destination_guide (
     destination_id  TEXT PRIMARY KEY,
     understand      TEXT,

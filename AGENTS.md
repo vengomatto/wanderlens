@@ -4,6 +4,7 @@
 
 - Run tests: `.venv/bin/python -m pytest -q`
 - End-to-end smoke: `bash scripts/smoke.sh`
+- Synthetic ranking quality: `.venv/bin/python -m wanderlens eval --synthetic`
 - CLI: `.venv/bin/python -m wanderlens <ingest|profile show|recommend|eval|serve|guide>`
 - Web dashboard (local, read-only): `.venv/bin/python -m wanderlens serve`
 
@@ -17,6 +18,9 @@
   enforces this.
 - **Everything persisted is user-scoped.** New tables/rows carry a `user_id`
   (see `core/db.py` / `docs/adr/0002`).
+- **Hosted model steps are cached and never fatal.** Enrichment/synthesis calls
+  are injectable, cached by input + model + prompt, and fall back to the local
+  deterministic result; they must not fail the run.
 - **Determinism.** Ranking must be repeatable for identical inputs; the LLM
   re-ranker is optional and injectable.
 

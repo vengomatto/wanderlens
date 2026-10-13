@@ -20,6 +20,7 @@ from wanderlens.core.recommend import (
     taste_embedding,
 )
 from wanderlens.db import connect, init_db
+from wanderlens.pipeline.enrichment import enrich_destination
 
 DEFAULT_CANDIDATE_COUNTRIES = ["GR", "HR", "ES", "PT", "CY", "IT", "FR", "TR", "ME", "AL"]
 
@@ -33,10 +34,17 @@ def load_taste_embedding(conn: sqlite3.Connection, user_id: int) -> Optional[np.
 
 
 def load_taste_facets(
-    conn: sqlite3.Connection, user_id: int, exclude_trip_id: Optional[int] = None
+    conn: sqlite3.Connection,
+    user_id: int,
+    exclude_trip_id: Optional[int] = None,
+    min_photos: int = 4,
 ) -> list[Facet]:
     """One normalized embedding centroid per trip (the taste facets), with the
-    trip's label so the closest visit can be named."""
+    trip's label so the closest visit can be named.
+
+    A trip's facet is weighted by ``min(1, n / min_photos)`` so a trip built on
+    one or two photos is not treated as a robust centroid.
+    """
     rows = conn.execute(
         """
         SELECT tp.trip_id AS trip_id, tr.country AS country, tr.city AS city, pe.vector AS vector
@@ -66,11 +74,13 @@ def load_taste_facets(
     for trip_id, vectors in groups.items():
         mean = np.mean(np.stack(vectors), axis=0).astype(np.float32)
         norm = np.linalg.norm(mean)
+        weight = 1.0 if min_photos <= 0 else min(1.0, len(vectors) / min_photos)
         facets.append(
             Facet(
                 trip_id=trip_id,
                 label=labels.get(trip_id, ""),
                 vector=mean / norm if norm else mean,
+                weight=weight,
             )
         )
     return facets
@@ -179,7 +189,7 @@ def run_recommend(
     embedder=None,
     catalog: Optional[JsonCatalog] = None,
     ranker=None,
-    alpha: float = 0.5,
+    alpha: float = 0.25,
     media: bool = False,
     media_fetcher=None,
     explainer=None,
@@ -187,6 +197,7 @@ def run_recommend(
     novelty: str = "balanced",
     popularity: bool = False,
     popularity_fetcher=None,
+    enricher=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -194,8 +205,15 @@ def run_recommend(
     init_db(conn)
     user_id = get_or_create_user(conn, user_name)
 
+    if enricher is None and getattr(config, "enrich_taste", False) and config.api_key:
+        from wanderlens.models.enricher import HostedTasteEnricher
+
+        enricher = HostedTasteEnricher(config.api_key, config.llm_model)
+
     taste = load_taste_embedding(conn, user_id)
-    facets = load_taste_facets(conn, user_id)
+    facets = load_taste_facets(
+        conn, user_id, min_photos=int(getattr(config, "facet_min_photos", 4))
+    )
     if not facets and taste is None:
         return []
 
@@ -216,6 +234,8 @@ def run_recommend(
     centers = load_trip_centers(conn, user_id)
     radius = getattr(config, "exclude_radius_km", 60.0)
     candidates = filter_unvisited_proximity(candidates, centers, radius)
+    if enricher is not None:
+        candidates = [enrich_destination(conn, user_id, d, enricher) for d in candidates]
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     profile = load_profile(conn, user_id, embedding=taste)
     tags = taste_attribute_weights(profile.tags)

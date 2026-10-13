@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 from wanderlens.config import Config
@@ -107,11 +107,17 @@ def _embed_photos(conn: sqlite3.Connection, user_id: int, photos: list[Photo], e
 
 
 def _store_subjects(
-    conn: sqlite3.Connection, user_id: int, trips: list[Trip], vision, sample_per_trip: int
+    conn: sqlite3.Connection,
+    user_id: int,
+    trips: list[Trip],
+    vision,
+    sample_per_trip: int,
+    enricher=None,
 ) -> None:
     from collections import Counter
 
     from wanderlens.core.vocabulary import canonicalize
+    from wanderlens.pipeline.enrichment import enrich_trip_attributes
 
     conn.execute("DELETE FROM trip_subjects WHERE user_id = ?", (user_id,))
     conn.execute(
@@ -128,6 +134,9 @@ def _store_subjects(
         attributes: set[str] = set()
         for tag in tags:
             attributes.update(canonicalize(tag))
+        context = ", ".join(p for p in (trip.city, trip.country) if p)
+        for attribute in enrich_trip_attributes(conn, user_id, trip.id, tags, enricher, context):
+            attributes.update(canonicalize(attribute))
         per_trip[trip.id] = attributes
         for attribute in sorted(attributes):
             conn.execute(
@@ -156,6 +165,7 @@ def run_profile(
     reverse_geocoder: Optional[ReverseGeocoder] = None,
     sample_per_trip: int = 3,
     retag: bool = False,
+    enricher=None,
 ) -> list[Trip]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -165,7 +175,12 @@ def run_profile(
     user_id = get_or_create_user(conn, user_name)
 
     photos = load_photos(conn, user_id)
-    trips = to_trips(cluster_into_trips(photos), reverse_geocoder=reverse_geocoder or default_reverse_geocoder(config))
+    clusters = cluster_into_trips(
+        photos,
+        max_gap=timedelta(hours=getattr(config, "split_gap_hours", 18.0)),
+        max_jump_km=getattr(config, "split_jump_km", 150.0),
+    )
+    trips = to_trips(clusters, reverse_geocoder=reverse_geocoder or default_reverse_geocoder(config))
 
     _persist_trips(conn, user_id, trips)
     _store_geography(conn, user_id, trips)
@@ -182,7 +197,7 @@ def run_profile(
             (user_id,),
         ).fetchone()[0]
         if retag or existing_subjects == 0:
-            _store_subjects(conn, user_id, trips, vision, sample_per_trip)
+            _store_subjects(conn, user_id, trips, vision, sample_per_trip, enricher)
 
     conn.commit()
     return trips

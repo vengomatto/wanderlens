@@ -39,6 +39,19 @@ def test_recommend_media_defaults_on():
     assert args.no_media is False
 
 
+def test_recommend_alpha_default_and_override():
+    parser = build_parser()
+    assert parser.parse_args(["recommend"]).alpha is None
+    assert parser.parse_args(["recommend", "--alpha", "0.7"]).alpha == 0.7
+
+
+def test_eval_synthetic_flag_parses():
+    parser = build_parser()
+    args = parser.parse_args(["eval", "--synthetic", "--k", "5"])
+    assert args.synthetic is True
+    assert args.k == 5
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

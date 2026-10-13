@@ -40,8 +40,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec.add_argument(
         "--alpha",
         type=float,
-        default=0.5,
-        help="weight of embedding similarity vs attribute match (0..1)",
+        default=None,
+        help="weight of embedding similarity vs attribute match (0..1; default from config, 0.25)",
     )
     p_rec.add_argument(
         "--no-media",
@@ -69,6 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
     p_eval.add_argument("--holdout", default=None, help="visited place to hold out")
+    p_eval.add_argument(
+        "--synthetic",
+        action="store_true",
+        help="rank the reproducible synthetic gallery instead of the archive",
+    )
+    p_eval.add_argument("--k", type=int, default=3, help="cut-off for precision@k (synthetic)")
     p_eval.set_defaults(func=cmd_eval)
 
     p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
@@ -100,7 +106,15 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
         vision = HostedVLM(config.api_key, config.vlm_model)
 
-    trips = run_profile(config, user_name=args.user, vision=vision, retag=args.retag)
+    enricher = None
+    if config.enrich_taste and config.api_key:
+        from wanderlens.models.enricher import HostedTasteEnricher
+
+        enricher = HostedTasteEnricher(config.api_key, config.llm_model)
+
+    trips = run_profile(
+        config, user_name=args.user, vision=vision, retag=args.retag, enricher=enricher
+    )
     print(
         f"Ingested {count} new photo(s); built profile with {len(trips)} trip(s) "
         f"into {config.db_path}"
@@ -133,7 +147,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         config,
         user_name=args.user,
         count=args.count,
-        alpha=args.alpha,
+        alpha=args.alpha if args.alpha is not None else config.alpha,
         media=not args.no_media,
         explainer=explainer,
         diversity=args.diversity,
@@ -156,9 +170,12 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
 
 def cmd_eval(args: argparse.Namespace) -> int:
-    from wanderlens.pipeline.evaluate import run_eval
+    from wanderlens.pipeline.evaluate import run_eval, run_synthetic_eval
 
     config = load_config(args.config)
+    if args.synthetic:
+        print(run_synthetic_eval(k=args.k))
+        return 0
     print(run_eval(config, user_name=args.user, holdout=args.holdout))
     return 0
 

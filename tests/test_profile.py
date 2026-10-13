@@ -162,3 +162,39 @@ def test_tagging_is_idempotent(tmp_path):
 
     run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy, retag=True)
     assert vision.calls > calls
+
+
+def test_profile_uses_enricher_for_structured_attributes(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)
+
+    class Enricher:
+        model = "stub"
+        prompt_version = "v1"
+
+        def __init__(self):
+            self.calls = 0
+
+        def attribute_trip(self, tags, context=""):
+            self.calls += 1
+            return ["wildlife"]
+
+    enricher = Enricher()
+    run_profile(
+        config,
+        embedder=FakeEmbedder(),
+        vision=FakeVision(["coastal cliffs"]),
+        reverse_geocoder=_italy,
+        enricher=enricher,
+    )
+
+    import sqlite3
+
+    conn = sqlite3.connect(config.db_path)
+    conn.row_factory = sqlite3.Row
+    subjects = {
+        r["key"] for r in conn.execute("SELECT key FROM profile_entries WHERE factor='subjects'")
+    }
+    assert "wildlife" in subjects
+    assert enricher.calls == 2
+

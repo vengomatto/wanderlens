@@ -84,7 +84,7 @@ already-downloaded files):
 
 .venv/bin/python -m wanderlens profile show
 .venv/bin/python -m wanderlens recommend --count 5
-.venv/bin/python -m wanderlens eval [--holdout Malta]
+.venv/bin/python -m wanderlens eval [--holdout Malta] [--synthetic]
 .venv/bin/python -m wanderlens guide [--count 5] [--refresh] [--no-llm]
 ```
 
@@ -99,6 +99,21 @@ Results are **diversified** (Maximal Marginal Relevance) so the list is not eigh
 variations of one vibe, and each carries a **famous / balanced / uncommon** label
 from Wikipedia pageviews. Tune with `recommend --diversity 0.25` and
 `recommend --novelty {familiar|balanced|uncommon}`.
+
+Ranking blends embedding similarity with canonical-attribute matching at `alpha`
+(default `0.25`, override with `WANDERLENS_ALPHA` or `recommend --alpha`).
+Attribute matching is word-boundary based and weighted by **specificity (IDF)**,
+and a trip contributes a full-weight taste facet only once it has a few photos.
+A hosted cheap model runs **as part of the chain** (not just as a fallback) to
+turn a trip's tags into structured attributes and to enrich thin destination text
+before embedding; results are cached by input + model + prompt, and a missing key
+or any model error falls back to the local, deterministic representation
+(`WANDERLENS_ENRICH_TASTE=0` disables it). Trip splitting is configurable via
+`WANDERLENS_SPLIT_GAP_HOURS` / `WANDERLENS_SPLIT_JUMP_KM`, and
+`WANDERLENS_FACET_MIN_PHOTOS` sets the photos needed for a full-weight facet.
+
+`eval --synthetic` ranks a reproducible synthetic gallery and reports
+**precision@k / MRR**, so ranking changes can be measured without a large archive.
 
 ### Web dashboard
 

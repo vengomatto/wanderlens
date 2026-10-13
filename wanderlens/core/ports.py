@@ -55,6 +55,20 @@ class DestinationMediaProvider(Protocol):
         ...
 
 
+class TasteEnricher(Protocol):
+    """Derives structured trip attributes and a richer destination description.
+    Injectable and pinned; a failure must fall back to the deterministic text."""
+
+    name: str
+    prompt_version: str
+
+    def attribute_trip(self, tags, context: str = "") -> list[str]:
+        ...
+
+    def description(self, destination: Destination) -> str:
+        ...
+
+
 class ExplanationSynthesizer(Protocol):
     """Turns a Recommendation's evidence into a short explanation. Injectable and
     pinned; a failure must fall back to the deterministic explanation."""
