@@ -8,7 +8,7 @@ from wanderlens.core.models import Destination
 NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_LOOKUP = "https://nominatim.openstreetmap.org/lookup"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
-OSM_USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
+OSM_USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
 CIRCLE_RADIUS_KM = {
     "region": 40.0,

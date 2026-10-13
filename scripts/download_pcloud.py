@@ -14,7 +14,6 @@ from pathlib import Path
 import requests
 
 API = "https://api.pcloud.com"
-DEFAULT_CODE = "REDACTED"  # REDACTED: Malta + Trentino
 DEFAULT_DEST = "data/photos"
 
 
@@ -73,9 +72,12 @@ def walk(node: dict, rel: str, code: str, dest: Path, existing: dict[str, set[in
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--code", default=DEFAULT_CODE)
+    parser.add_argument("--code", default=os.environ.get("PCLOUD_CODE"))
     parser.add_argument("--dest", default=DEFAULT_DEST)
     args = parser.parse_args()
+
+    if not args.code:
+        parser.error("provide a pCloud public-link code via --code or the PCLOUD_CODE env var")
 
     dest = Path(args.dest)
     dest.mkdir(parents=True, exist_ok=True)

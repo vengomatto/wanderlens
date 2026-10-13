@@ -73,7 +73,7 @@ To pull photos from a pCloud public folder link (walks subfolders, skips
 already-downloaded files):
 
 ```bash
-.venv/bin/python scripts/download_pcloud.py --code <public-link-code>
+.venv/bin/python scripts/download_pcloud.py --code <public-link-code>   # or set PCLOUD_CODE
 ```
 
 ## Use

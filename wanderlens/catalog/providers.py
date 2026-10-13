@@ -6,7 +6,7 @@ from typing import Optional
 from wanderlens.catalog.fetch import fetch_wikidata_description, fetch_wikipedia_summary
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-OSM_USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
+OSM_USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
 _FEATURE_WORDS = {
     "natural": {

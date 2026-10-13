@@ -12,7 +12,7 @@ WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 WIKIVOYAGE_API = "https://en.wikivoyage.org/w/api.php"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
-USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
+USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
 
 def fetch_wikipedia_summary(

@@ -8,7 +8,7 @@ from wanderlens.catalog.destinations import JsonCatalog
 from wanderlens.core.models import Destination
 
 API = "https://en.wikivoyage.org/w/api.php"
-USER_AGENT = "wanderlens/0.1 (personal project; noreply@users.noreply.github.com)"
+USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
 _SECTIONS = (("Regions", "region"), ("Cities", "city"), ("Other destinations", "other"))
 _SKIP_PREFIXES = ("file:", "image:", "category:")
