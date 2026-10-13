@@ -52,6 +52,18 @@ def test_eval_synthetic_flag_parses():
     assert args.k == 5
 
 
+def test_feedback_flags_parse():
+    parser = build_parser()
+    args = parser.parse_args(["feedback", "--destination", "wv:Kotor", "--action", "like"])
+    assert args.destination == "wv:Kotor"
+    assert args.action == "like"
+
+
+def test_recommend_refresh_media_flag_parses():
+    parser = build_parser()
+    assert parser.parse_args(["recommend", "--refresh-media"]).refresh_media is True
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

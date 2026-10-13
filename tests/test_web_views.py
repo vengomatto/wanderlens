@@ -313,3 +313,25 @@ def test_destination_detail_includes_case(tmp_path):
     assert detail.case_narrative == "A compelling case."
     assert detail.case_source == "llm"
 
+
+def test_record_and_read_feedback(tmp_path):
+    conn = _seed(tmp_path)
+
+    views.record_feedback(conn, 1, "wy:algarve", "like")
+
+    assert views.feedback_action(conn, 1, "wy:algarve") == "like"
+    assert views.destination_detail(conn, 1, "wy:algarve").feedback_action == "like"
+
+
+def test_recommendations_include_case_snippet(tmp_path):
+    conn = _seed(tmp_path)
+    conn.execute(
+        "INSERT INTO destination_case (destination_id, input_hash, narrative, sources, source) "
+        "VALUES ('wy:algarve', 'h', 'A compelling case for Algarve.', '[]', 'llm')"
+    )
+    conn.commit()
+
+    recs = views.recommendations_view(conn, 1)
+    by_id = {rec.destination_id: rec for rec in recs}
+    assert "compelling" in by_id["wy:algarve"].case_snippet
+

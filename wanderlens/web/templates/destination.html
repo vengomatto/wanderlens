@@ -69,6 +69,11 @@
         {% if detail.embedding_score is not none %}<span class="score-part">emb {{ "%.3f" | format(detail.embedding_score) }}</span>{% endif %}
         {% if detail.attribute_score is not none %}<span class="score-part">attr {{ "%.3f" | format(detail.attribute_score) }}</span>{% endif %}
       </div>
+      <div class="feedback">
+        {% for action in ['like', 'save', 'dislike', 'skip'] %}
+        <a href="/destinations/{{ detail.destination_id | urlencode }}/feedback?action={{ action }}" class="fb fb-{{ action }}{% if detail.feedback_action == action %} active{% endif %}">{{ action }}</a>
+        {% endfor %}
+      </div>
     </section>
   </div>
 

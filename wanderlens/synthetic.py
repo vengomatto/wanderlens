@@ -5,10 +5,16 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 from wanderlens.catalog.destinations import destination_to_dict
 from wanderlens.core.models import Destination
+
+_CLUSTER_VECTORS = {
+    "coastal": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+    "mountain": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+}
 
 # Two taste clusters so ranking has something to separate.
 _CLUSTERS = {
@@ -113,3 +119,55 @@ def materialize(
         json.dumps([destination_to_dict(d) for d in destinations], indent=2)
     )
     return {"photos": photo_count, "trips": trip_count, "destinations": len(destinations)}
+
+
+class SyntheticVision:
+    """A deterministic stand-in for the vision model: tags from the photo's cluster."""
+
+    def describe(self, paths) -> list[str]:
+        attributes: list[str] = []
+        for path in paths:
+            cluster = Path(path).name.split("_")[0]
+            attributes.extend(_ATTRIBUTES.get(cluster, []))
+        return attributes
+
+
+class SyntheticEmbedder:
+    """A deterministic cluster-based embedder, so no ONNX runtime is needed."""
+
+    dim = 3
+
+    def _cluster(self, path: str) -> str:
+        return Path(path).name.split("_")[0]
+
+    def embed_image(self, path: str):
+        return _CLUSTER_VECTORS.get(self._cluster(path), np.array([0.0, 0.0, 1.0], dtype=np.float32))
+
+    def embed_text(self, text: str):
+        lowered = (text or "").lower()
+        if any(word in lowered for word in ("coast", "beach", "water", "boat")):
+            return _CLUSTER_VECTORS["coastal"]
+        if any(word in lowered for word in ("mountain", "hiking", "snow", "nature")):
+            return _CLUSTER_VECTORS["mountain"]
+        return np.array([0.0, 0.0, 1.0], dtype=np.float32)
+
+
+def seed_profile(target_dir: str | Path) -> int:
+    """Ingest and profile the materialised archive with the synthetic vision/embedder."""
+    from wanderlens.config import Config
+    from wanderlens.pipeline.ingest import run_ingest
+    from wanderlens.pipeline.profile import run_profile
+
+    target = Path(target_dir)
+    config = Config(
+        data_dir=target,
+        photos_dir=target / "photos",
+        db_path=target / "wanderlens.sqlite3",
+        catalog_path=target / "catalog",
+        vlm_provider="synthetic",
+        vlm_model="synthetic",
+        api_key=None,
+    )
+    run_ingest(config)
+    trips = run_profile(config, embedder=SyntheticEmbedder(), vision=SyntheticVision())
+    return len(trips)

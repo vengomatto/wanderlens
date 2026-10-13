@@ -46,6 +46,7 @@ def gather_guide(
     synthesizer=None,
     days: int = DEFAULT_ITINERARY_DAYS,
     blogs=None,
+    searcher=None,
 ) -> dict:
     """Gather every guide section best-effort; a missing source omits its section."""
     try:
@@ -62,6 +63,15 @@ def gather_guide(
         except Exception:
             pois = []
 
+    search_results: list[dict] = []
+    if searcher is not None and synthesizer is not None:
+        try:
+            search_results = searcher.search(
+                f"{destination.name} {destination.country} itinerary", limit=5
+            ) or []
+        except Exception:
+            search_results = []
+
     return {
         "understand": _truncate((voyage or {}).get("extract", ""), MAX_UNDERSTAND),
         "links": _links(destination, voyage, wikidata_id, session),
@@ -69,7 +79,7 @@ def gather_guide(
         "pois": pois,
         "climate": _climate(destination, session),
         "films": _films(wikidata_id, session),
-        "itineraries": _itineraries(destination, voyage, pois, synthesizer, days),
+        "itineraries": _itineraries(destination, voyage, pois, synthesizer, days, search_results),
         "diaries": _diaries(destination, voyage, blogs),
     }
 
@@ -185,7 +195,7 @@ def _poi_itinerary(pois: list[dict], days: int) -> list[dict]:
     return plan
 
 
-def _itineraries(destination, voyage, pois, synthesizer, days) -> list[dict]:
+def _itineraries(destination, voyage, pois, synthesizer, days, search_results=None) -> list[dict]:
     itineraries: list[dict] = []
     for item in (voyage or {}).get("itineraries", []):
         itineraries.append(
@@ -200,7 +210,9 @@ def _itineraries(destination, voyage, pois, synthesizer, days) -> list[dict]:
     synthesised: list[dict] = []
     if synthesizer is not None:
         try:
-            synthesised = synthesizer.synthesize(destination, pois, days)
+            synthesised = synthesizer.synthesize(
+                destination, pois, days, search_results=search_results
+            )
         except Exception:
             synthesised = []
         if synthesised:
@@ -278,11 +290,14 @@ def fetch_guide(
     days: int = DEFAULT_ITINERARY_DAYS,
     refresh: bool = False,
     blogs=None,
+    searcher=None,
 ) -> bool:
     """Build and cache one guide. Returns whether it was (re)built."""
     if not refresh and is_guide_cached(conn, destination.id):
         return False
-    data = gather_guide(destination, session=session, synthesizer=synthesizer, days=days, blogs=blogs)
+    data = gather_guide(
+        destination, session=session, synthesizer=synthesizer, days=days, blogs=blogs, searcher=searcher
+    )
     store_guide(conn, destination.id, data)
     return True
 
@@ -295,6 +310,7 @@ def build_guides_for(
     days: int = DEFAULT_ITINERARY_DAYS,
     refresh: bool = False,
     blogs=None,
+    searcher=None,
 ) -> int:
     built = 0
     for destination in destinations:
@@ -307,6 +323,7 @@ def build_guides_for(
                 days=days,
                 refresh=refresh,
                 blogs=blogs,
+                searcher=searcher,
             ):
                 built += 1
         except Exception:

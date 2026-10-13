@@ -28,6 +28,27 @@ def _structure(text: str) -> tuple[str, list[str]]:
     return sentences[0], sentences[1:5]
 
 
+def record_feedback(conn: sqlite3.Connection, user_id: int, destination_id: str, action: str) -> None:
+    from datetime import datetime, timezone
+
+    if action not in {"save", "like", "dislike", "skip"}:
+        return
+    conn.execute(
+        "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (user_id, destination_id, action, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+
+
+def feedback_action(conn: sqlite3.Connection, user_id: int, destination_id: str) -> str:
+    row = conn.execute(
+        "SELECT action FROM feedback WHERE user_id = ? AND destination_id = ?",
+        (user_id, destination_id),
+    ).fetchone()
+    return row["action"] if row else ""
+
+
 def external_photo_links(name: str, country: str = "") -> list[dict]:
     """Outbound photo searches — links only, never embedded proprietary images."""
     query = quote_plus(f"{name} {country}".strip())
@@ -76,6 +97,7 @@ class RecView:
     best_trip_label: str = ""
     nearest_trip_km: Optional[float] = None
     popularity_label: str = ""
+    case_snippet: str = ""
 
 
 @dataclass
@@ -136,6 +158,7 @@ class DestinationDetail:
     case_source: str = ""
     diaries: list[dict] = field(default_factory=list)
     external_photo_links: list[dict] = field(default_factory=list)
+    feedback_action: str = ""
 
 
 @dataclass
@@ -335,9 +358,20 @@ def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView
             best_trip_label=row["best_trip_label"] or "",
             nearest_trip_km=row["nearest_trip_km"],
             popularity_label=row["popularity_label"] or "",
+            case_snippet=_case_snippet(conn, row["destination_id"]),
         )
         for row in rows
     ]
+
+
+def _case_snippet(conn: sqlite3.Connection, destination_id: str, limit: int = 180) -> str:
+    case = load_case(conn, destination_id)
+    if not case or not case.get("narrative"):
+        return ""
+    narrative = case["narrative"].strip()
+    if len(narrative) <= limit:
+        return narrative
+    return narrative[:limit].rsplit(" ", 1)[0].rstrip(" ,.;:") + "…"
 
 
 def _destinations_with_images(conn: sqlite3.Connection, destination_ids: list[str]) -> set[str]:
@@ -425,6 +459,7 @@ def destination_detail(
         case_narrative=(case.get("narrative") or ""),
         case_sources=(case.get("sources") or []),
         case_source=(case.get("source") or ""),
+        feedback_action=feedback_action(conn, user_id, destination_id),
         description_lead=description_lead,
         description_highlights=description_highlights,
         diaries=_json_list(guide["diaries"]) if guide and "diaries" in guide.keys() else [],

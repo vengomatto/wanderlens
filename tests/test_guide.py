@@ -227,7 +227,7 @@ class FakeSynthesizer:
     prompt_version = "itinerary-v1"
     model = "test-model"
 
-    def synthesize(self, destination, pois, days):
+    def synthesize(self, destination, pois, days, search_results=None):
         return [{"title": "Day 1", "summary": "Arrive", "items": ["Beach"]}]
 
 
@@ -236,7 +236,7 @@ class BoomSynthesizer:
     prompt_version = "itinerary-v1"
     model = "test-model"
 
-    def synthesize(self, destination, pois, days):
+    def synthesize(self, destination, pois, days, search_results=None):
         raise RuntimeError("no")
 
 
@@ -310,4 +310,38 @@ def test_diaries_gathered_and_deduped():
     assert "https://www.visitalgarve.pt" in urls
     assert "https://example.org/blog" in urls
     assert len(urls) == len(set(urls)), "diaries are deduplicated"
+
+
+def test_itinerary_is_grounded_in_search():
+    class Searcher:
+        name = "stub"
+
+        def __init__(self):
+            self.queries = []
+
+        def search(self, query, limit=5):
+            self.queries.append(query)
+            return [{"title": "Algarve in 3 days", "url": "u", "snippet": "s"}]
+
+    class RecordingSynth:
+        prompt_version = "v"
+        model = "m"
+
+        def __init__(self):
+            self.seen = None
+
+        def synthesize(self, destination, pois, days, search_results=None):
+            self.seen = search_results
+            return [{"title": "Day 1", "summary": "", "items": []}]
+
+    searcher = Searcher()
+    synth = RecordingSynth()
+
+    guide = gather_guide(
+        _destination(), session=_session(), synthesizer=synth, searcher=searcher
+    )
+
+    assert searcher.queries
+    assert synth.seen and synth.seen[0]["title"] == "Algarve in 3 days"
+    assert any(it["source"] == "llm" for it in guide["itineraries"])
 

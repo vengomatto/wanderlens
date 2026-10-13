@@ -6,7 +6,7 @@
 - End-to-end smoke: `bash scripts/smoke.sh`
 - Synthetic ranking quality: `.venv/bin/python -m wanderlens eval --synthetic`
 - Runnable mock archive: `.venv/bin/python -m wanderlens synthetic --dir /tmp/wl-syn`
-- CLI: `.venv/bin/python -m wanderlens <ingest|profile show|recommend|eval|serve|guide|synthetic>`
+- CLI: `.venv/bin/python -m wanderlens <ingest|profile show|recommend|eval|serve|guide|synthetic|feedback>`
 - Web dashboard (local, read-only): `.venv/bin/python -m wanderlens serve`
 
 ## Conventions

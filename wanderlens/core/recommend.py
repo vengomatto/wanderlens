@@ -192,6 +192,8 @@ def rank_destinations(
     novelty: str = "balanced",
     popularity: Optional[dict[str, float]] = None,
     novelty_weight: float = 0.15,
+    feedback: Optional[dict[str, str]] = None,
+    feedback_weight: float = 0.15,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -252,6 +254,12 @@ def rank_destinations(
         if pop is not None and novelty in {"familiar", "uncommon"}:
             delta = pop - 0.5
             score += novelty_weight * delta * (1 if novelty == "familiar" else -1)
+
+        action = feedback.get(destination.id) if feedback else None
+        if action in {"like", "save"}:
+            score += feedback_weight
+        elif action in {"dislike", "skip"}:
+            score -= feedback_weight
 
         scored.append(
             (

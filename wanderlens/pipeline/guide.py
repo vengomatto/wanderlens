@@ -39,6 +39,7 @@ def run_guide(
     refresh: bool = False,
     synthesizer=None,
     session=None,
+    searcher=None,
 ) -> int:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -53,4 +54,5 @@ def run_guide(
         synthesizer=synthesizer,
         refresh=refresh,
         blogs=getattr(config, "travel_blogs", []),
+        searcher=searcher,
     )

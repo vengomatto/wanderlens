@@ -3,9 +3,12 @@ from __future__ import annotations
 import re
 import sqlite3
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
+
+from PIL import Image
 
 from wanderlens.catalog.fetch import (
     fetch_commons_category,
@@ -320,6 +323,33 @@ def _download(session, url: str, destination: Path) -> None:
     destination.write_bytes(response.content)
 
 
+def _fetch_bytes(session, url: str) -> bytes:
+    import requests
+
+    from wanderlens.catalog.fetch import USER_AGENT
+
+    http = session or requests
+    response = http.get(url, headers={"User-Agent": USER_AGENT}, timeout=60)
+    response.raise_for_status()
+    return response.content
+
+
+def _average_hash(data: bytes) -> int:
+    """A 64-bit average hash for perceptual near-duplicate detection."""
+    with Image.open(BytesIO(data)) as image:
+        pixels = list(image.convert("L").resize((8, 8)).tobytes())
+    average = sum(pixels) / len(pixels)
+    bits = 0
+    for index, value in enumerate(pixels):
+        if value >= average:
+            bits |= 1 << index
+    return bits
+
+
+def _hamming(a: int, b: int) -> int:
+    return bin(a ^ b).count("1")
+
+
 def is_media_cached(conn: sqlite3.Connection, destination_id: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM destination_media WHERE destination_id = ?", (destination_id,)
@@ -333,9 +363,10 @@ def fetch_media(
     media_dir: str | Path,
     chain: Optional[list] = None,
     session=None,
+    refresh: bool = False,
 ) -> bool:
     """Fetch and cache media for one destination. Returns whether it was fetched."""
-    if is_media_cached(conn, destination.id):
+    if is_media_cached(conn, destination.id) and not refresh:
         return False
 
     chain = chain if chain is not None else build_media_chain(session=session)
@@ -359,10 +390,24 @@ def fetch_media(
     key = _safe_id(destination.id)
 
     downloaded: list[tuple[str, str, str, str]] = []
+    kept_hashes: list[int] = []
     for image in bundle.images if bundle else []:
+        try:
+            data = _fetch_bytes(session, image.url)
+        except Exception:
+            continue
+        try:
+            digest = _average_hash(data)
+        except Exception:
+            digest = None
+        if digest is not None and any(
+            other is not None and _hamming(digest, other) <= 4 for other in kept_hashes
+        ):
+            continue
+        kept_hashes.append(digest)
         filename = f"{key}_{len(downloaded)}{_extension(image.url)}"
         try:
-            _download(session, image.url, media_dir / filename)
+            (media_dir / filename).write_bytes(data)
         except Exception:
             continue
         downloaded.append((filename, image.source, image.license, image.attribution))
@@ -404,12 +449,15 @@ def fetch_media_for(
     media_dir: str | Path,
     chain: Optional[list] = None,
     session=None,
+    refresh: bool = False,
 ) -> int:
     """Best-effort media fetch for a batch of recommendations; never raises."""
     stored = 0
     for rec in recommendations:
         try:
-            if fetch_media(conn, rec.destination, media_dir, chain=chain, session=session):
+            if fetch_media(
+                conn, rec.destination, media_dir, chain=chain, session=session, refresh=refresh
+            ):
                 stored += 1
         except Exception:
             continue

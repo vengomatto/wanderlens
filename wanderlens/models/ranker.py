@@ -103,12 +103,16 @@ class HostedItinerarySynthesizer:
         self.model = model
         self.text = HostedTextModel(api_key, model, timeout)
 
-    def synthesize(self, destination, pois: list, days: int) -> list:
+    def synthesize(self, destination, pois: list, days: int, search_results=None) -> list:
         payload = {
             "destination": destination.name,
             "country": destination.country,
             "days": days,
             "points_of_interest": [p.get("name") for p in pois if p.get("name")][:30],
+            "search_results": [
+                {"title": r.get("title", ""), "snippet": r.get("snippet", "")}
+                for r in (search_results or [])
+            ][:8],
         }
         text = self.text.complete(_ITINERARY_SYSTEM + "\n\n" + json.dumps(payload, ensure_ascii=False))
         start, end = text.find("["), text.rfind("]")

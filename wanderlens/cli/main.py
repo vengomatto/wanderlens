@@ -65,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="balanced",
         help="bias selection toward famous or uncommon places",
     )
+    p_rec.add_argument(
+        "--refresh-media",
+        action="store_true",
+        help="re-fetch destination media even if it is already cached",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -85,6 +90,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_syn.add_argument("--trips-per-taste", type=int, default=8)
     p_syn.add_argument("--destinations-per-taste", type=int, default=12)
     p_syn.set_defaults(func=cmd_synthetic)
+
+    p_fb = sub.add_parser("feedback", help="record or inspect destination feedback")
+    p_fb.add_argument("--destination", default=None, help="destination id to react to")
+    p_fb.add_argument(
+        "--action", choices=["save", "like", "dislike", "skip"], default=None
+    )
+    p_fb.add_argument("--list", action="store_true", help="list recorded feedback")
+    p_fb.add_argument("--clear", action="store_true", help="clear all feedback")
+    p_fb.set_defaults(func=cmd_feedback)
 
     p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
     p_serve.add_argument("--host", default="127.0.0.1", help="bind host (localhost only by default)")
@@ -144,6 +158,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     from wanderlens.pipeline.recommend import run_recommend
 
     config = load_config(args.config)
+    config.refresh_media = config.refresh_media or args.refresh_media
     explainer = None
     if args.explain_llm or config.explain_llm:
         if config.api_key:
@@ -204,21 +219,61 @@ def cmd_eval(args: argparse.Namespace) -> int:
 
 
 def cmd_synthetic(args: argparse.Namespace) -> int:
-    from wanderlens.synthetic import materialize
+    from wanderlens.synthetic import materialize, seed_profile
 
     counts = materialize(
         args.dir,
         trips_per_taste=args.trips_per_taste,
         destinations_per_taste=args.destinations_per_taste,
     )
+    trips = seed_profile(args.dir)
     print(
         f"Wrote {counts['photos']} photos, {counts['trips']} trips, "
         f"and {counts['destinations']} destinations into {args.dir}"
     )
-    print(f"Then run: WANDERLENS_DATA_DIR={args.dir} .venv/bin/python -m wanderlens ingest")
+    print(f"Profiled {trips} tagged trip(s) (deterministic vision + embedder).")
     print(
-        f"          WANDERLENS_DATA_DIR={args.dir} .venv/bin/python -m wanderlens recommend --count 10"
+        f"Then run: WANDERLENS_DATA_DIR={args.dir} WANDERLENS_EMBEDDER=synthetic "
+        f"WANDERLENS_BUILD_CASE=0 .venv/bin/python -m wanderlens recommend --count 10"
     )
+    return 0
+
+
+def cmd_feedback(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+
+    from wanderlens.db import connect, init_db
+    from wanderlens.pipeline.ingest import get_or_create_user
+
+    config = load_config(args.config)
+    conn = connect(config.db_path)
+    init_db(conn)
+    user_id = get_or_create_user(conn, args.user)
+
+    if args.clear:
+        conn.execute("DELETE FROM feedback WHERE user_id = ?", (user_id,))
+        conn.commit()
+        print("Cleared feedback.")
+        return 0
+    if args.destination and args.action:
+        conn.execute(
+            "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, args.destination, args.action, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        print(f"Recorded {args.action} for {args.destination}.")
+        return 0
+
+    rows = conn.execute(
+        "SELECT destination_id, action FROM feedback WHERE user_id = ? ORDER BY destination_id",
+        (user_id,),
+    ).fetchall()
+    if not rows:
+        print("No feedback recorded.")
+        return 0
+    for row in rows:
+        print(f"{row['destination_id']}: {row['action']}")
     return 0
 
 
@@ -246,12 +301,20 @@ def cmd_guide(args: argparse.Namespace) -> int:
             synthesizer = HostedItinerarySynthesizer(config.api_key, config.llm_model)
         else:
             print("No API key configured; building guides without a synthesised itinerary.")
+
+    searcher = None
+    if synthesizer is not None:
+        from wanderlens.catalog.search import DuckDuckGoSearchProvider
+
+        searcher = DuckDuckGoSearchProvider()
+
     built = run_guide(
         config,
         user_name=args.user,
         count=args.count,
         refresh=args.refresh,
         synthesizer=synthesizer,
+        searcher=searcher,
     )
     print(f"Built guides for {built} destination(s) into {config.db_path}")
     return 0

@@ -7,6 +7,11 @@ from typing import Mapping, Optional
 
 import yaml
 
+DEFAULT_TRAVEL_BLOGS = [
+    "https://www.nomadicmatt.com/travel-guides/",
+    "https://www.lonelyplanet.com/",
+]
+
 
 @dataclass
 class Config:
@@ -32,8 +37,10 @@ class Config:
     alpha: float = 0.25
     enrich_taste: bool = True
     build_case: bool = True
-    travel_blogs: list[str] = field(default_factory=list)
+    travel_blogs: list[str] = field(default_factory=lambda: list(DEFAULT_TRAVEL_BLOGS))
     media_sources: list[str] = field(default_factory=list)
+    refresh_media: bool = False
+    embedder: str = "clip"
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -132,7 +139,8 @@ def load_config(
         ),
         travel_blogs=_string_list(
             values.get("travel_blogs") or env.get("WANDERLENS_TRAVEL_BLOGS")
-        ),
+        )
+        or list(DEFAULT_TRAVEL_BLOGS),
         build_case=(
             bool(values.get("build_case"))
             if "build_case" in values
@@ -141,6 +149,12 @@ def load_config(
         media_sources=_string_list(
             values.get("media_sources") or env.get("WANDERLENS_MEDIA_SOURCES")
         ),
+        refresh_media=(
+            bool(values.get("refresh_media"))
+            if "refresh_media" in values
+            else str(env.get("WANDERLENS_REFRESH_MEDIA", "")).lower() in {"1", "true", "yes", "on"}
+        ),
+        embedder=values.get("embedder") or env.get("WANDERLENS_EMBEDDER") or "clip",
     )
 
 

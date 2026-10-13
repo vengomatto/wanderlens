@@ -87,6 +87,7 @@ already-downloaded files):
 .venv/bin/python -m wanderlens eval [--holdout Malta] [--synthetic]
 .venv/bin/python -m wanderlens guide [--count 5] [--refresh] [--no-llm]
 .venv/bin/python -m wanderlens synthetic --dir /tmp/wl-syn   # runnable mock archive
+.venv/bin/python -m wanderlens feedback --destination wv:Kotor --action like
 ```
 
 The "why this is for you" is evidence-based: each Recommendation names the
@@ -117,9 +118,18 @@ or any model error falls back to the local, deterministic representation
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
 
 `wanderlens synthetic --dir <dir>` writes a deterministic **runnable mock
-archive** (photos with EXIF plus a candidate catalog); point
-`WANDERLENS_DATA_DIR=<dir>` at it and run `ingest` / `recommend` to exercise the
-whole pipeline on a broad dataset instead of a few photos.
+archive** (photos with EXIF plus a candidate catalog) and profiles it with a
+deterministic vision + embedder, so attribute taste is exercised without a key;
+point `WANDERLENS_DATA_DIR=<dir> WANDERLENS_EMBEDDER=synthetic` at it and run
+`recommend` to test ranking on a broad dataset instead of a few photos.
+
+**Feedback** biases ranking: `wanderlens feedback --destination <id> --action
+{like|save|dislike|skip}` (or the buttons on a destination page) records a
+reaction, and likes/saves are favoured while dislikes/skips are pushed down;
+`--list` shows and `--clear` removes it. Catalog names are normalized and
+deduplicated on load. `recommend --refresh-media` re-fetches media so the new
+quality tiering applies to already-cached destinations, and near-duplicate images
+are dropped by perceptual hash.
 
 Each recommended destination also gets a **sourced case** — a short narrative
 plus citation links — built from Wikivoyage/Wikipedia/Wikidata. With an

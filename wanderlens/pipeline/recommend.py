@@ -23,7 +23,11 @@ from wanderlens.core.recommend import (
 from wanderlens.db import connect, init_db
 from wanderlens.pipeline.enrichment import enrich_destination
 
-DEFAULT_CANDIDATE_COUNTRIES = ["GR", "HR", "ES", "PT", "CY", "IT", "FR", "TR", "ME", "AL"]
+DEFAULT_CANDIDATE_COUNTRIES = [
+    "GR", "HR", "ES", "PT", "CY", "IT", "FR", "TR", "ME", "AL",
+    "DE", "AT", "CH", "SI", "NL", "BE", "IE", "GB", "PL", "CZ",
+    "SK", "HU", "RO", "BG", "SE", "NO", "DK", "FI", "IS", "MT",
+]
 
 
 def load_taste_embedding(conn: sqlite3.Connection, user_id: int) -> Optional[np.ndarray]:
@@ -127,6 +131,13 @@ def load_profile(conn: sqlite3.Connection, user_id: int, embedding=None) -> Tast
     return TasteProfile(user_id=user_id, geography=geography, tags=tags, embedding=embedding)
 
 
+def load_feedback(conn: sqlite3.Connection, user_id: int) -> dict[str, str]:
+    rows = conn.execute(
+        "SELECT destination_id, action FROM feedback WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    return {row["destination_id"]: row["action"] for row in rows}
+
+
 def _geonames_catalog(
     config, country_codes, limit: int, min_population: int = 50000, providers=None
 ) -> JsonCatalog:
@@ -221,9 +232,14 @@ def run_recommend(
         return []
 
     if embedder is None:
-        from wanderlens.models.embeddings import OnnxClipEmbedder
+        if getattr(config, "embedder", "clip") == "synthetic":
+            from wanderlens.synthetic import SyntheticEmbedder
 
-        embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
+            embedder = SyntheticEmbedder()
+        else:
+            from wanderlens.models.embeddings import OnnxClipEmbedder
+
+            embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
 
     catalog = catalog or default_catalog(config)
     visited = {
@@ -242,6 +258,7 @@ def run_recommend(
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
     profile = load_profile(conn, user_id, embedding=taste)
     tags = taste_attribute_weights(profile.tags)
+    feedback = load_feedback(conn, user_id)
 
     shortlist_size = min(len(candidates), max(count * 4, 20))
     shortlist = rank_destinations(
@@ -254,6 +271,7 @@ def run_recommend(
         alpha=alpha,
         taste_facets=facets,
         visited_centers=centers,
+        feedback=feedback,
     )
 
     popularity_scores: dict[str, float] = {}
@@ -263,6 +281,18 @@ def run_recommend(
             popularity_scores = fetcher(conn, [rec.destination for rec in shortlist]) or {}
         except Exception:
             popularity_scores = {}
+
+    if case_searcher is not None or case_writer is not None:
+        for rec in shortlist:
+            try:
+                build_case(
+                    conn,
+                    rec.destination,
+                    searcher=case_searcher,
+                    writer=case_writer,
+                )
+            except Exception:
+                continue
 
     recommendations = rank_destinations(
         taste,
@@ -277,6 +307,7 @@ def run_recommend(
         diversity=diversity,
         novelty=novelty,
         popularity=popularity_scores,
+        feedback=feedback,
     )
 
     visited_country = (
@@ -324,18 +355,6 @@ def run_recommend(
             ),
         )
     conn.commit()
-
-    if case_searcher is not None or case_writer is not None:
-        for rec in recommendations:
-            try:
-                build_case(
-                    conn,
-                    rec.destination,
-                    searcher=case_searcher,
-                    writer=case_writer,
-                )
-            except Exception:
-                continue
 
     if media:
         fetcher = media_fetcher or _default_media_fetcher
@@ -417,7 +436,13 @@ def _default_media_fetcher(conn, recommendations, config) -> int:
     from wanderlens.catalog.media import build_media_chain, fetch_media_for
 
     chain = build_media_chain(sources=getattr(config, "media_sources", []))
-    return fetch_media_for(conn, recommendations, config.data_dir / "media", chain=chain)
+    return fetch_media_for(
+        conn,
+        recommendations,
+        config.data_dir / "media",
+        chain=chain,
+        refresh=getattr(config, "refresh_media", False),
+    )
 
 
 def _default_popularity_fetcher(conn, destinations) -> dict:

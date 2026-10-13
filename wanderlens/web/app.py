@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image, ImageOps
@@ -129,6 +129,18 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             similar=similar,
             map_payload=map_payload,
         )
+
+    @app.get("/destinations/{destination_id}/feedback")
+    def destination_feedback(destination_id: str, action: str = "") -> RedirectResponse:
+        conn = connect(app.state.config.db_path)
+        try:
+            _open(conn)
+            user_id = views.resolve_user(conn, app.state.user_name)
+            if user_id is not None:
+                views.record_feedback(conn, user_id, destination_id, action)
+        finally:
+            conn.close()
+        return RedirectResponse(url=f"/destinations/{destination_id}", status_code=303)
 
     @app.get("/destination-image/{destination_id}/{position}")
     def destination_image(request: Request, destination_id: str, position: int) -> FileResponse:

@@ -35,6 +35,7 @@
           {% if rec.popularity_label %}<span class="fame fame-{{ rec.popularity_label }}">{{ rec.popularity_label }}</span>{% endif %}
         </div>
         {% if rec.description %}<p class="desc">{{ rec.description }}</p>{% endif %}
+        {% if rec.case_snippet %}<p class="case-snippet">{{ rec.case_snippet }} <a href="/destinations/{{ rec.destination_id | urlencode }}">Read more →</a></p>{% endif %}
         {% if rec.explanation %}<p class="why">{{ rec.explanation }}</p>{% endif %}
         <div class="scores">
           {% if rec.embedding_score is not none %}<span class="score-part">emb {{ "%.3f" | format(rec.embedding_score) }}</span>{% endif %}

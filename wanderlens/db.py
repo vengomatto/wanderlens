@@ -163,6 +163,14 @@ CREATE TABLE IF NOT EXISTS destination_case (
     PRIMARY KEY (destination_id, input_hash)
 );
 
+CREATE TABLE IF NOT EXISTS feedback (
+    user_id         INTEGER NOT NULL,
+    destination_id  TEXT    NOT NULL,
+    action          TEXT    NOT NULL,
+    created_at      TEXT,
+    PRIMARY KEY (user_id, destination_id)
+);
+
 CREATE TABLE IF NOT EXISTS destination_guide (
     destination_id  TEXT PRIMARY KEY,
     understand      TEXT,
