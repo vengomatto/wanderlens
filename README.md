@@ -122,6 +122,14 @@ or any model error falls back to the local, deterministic representation
 `WANDERLENS_SPLIT_GAP_HOURS` / `WANDERLENS_SPLIT_JUMP_KM`, and
 `WANDERLENS_FACET_MIN_PHOTOS` sets the photos needed for a full-weight facet.
 
+**Image matching:** `recommend --image-matching` (off by default, or
+`WANDERLENS_IMAGE_MATCHING=1`) scores each candidate by the best taste-facet match
+against a visual vector built from its own hero images (Wikidata/Commons), with the
+text embedding as the fallback when a place has no images — a direct
+photo-to-photo comparison rather than across modalities. It needs network and CLIP
+vision, and is cached per destination. It is opt-in pending measurement on
+`eval --loto`.
+
 `eval --synthetic` ranks a reproducible synthetic gallery and reports
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
 `eval --loto` runs **leave-one-trip-out** evaluation over every trip and reports

@@ -47,6 +47,7 @@ class Config:
     climate_weight: float = 0.0
     season: str = ""
     tag_provider: str = "clip"
+    image_matching: bool = False
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -196,6 +197,11 @@ def load_config(
         tag_provider=str(
             values.get("tag_provider") or env.get("WANDERLENS_TAG_PROVIDER") or "clip"
         ).lower(),
+        image_matching=(
+            bool(values.get("image_matching"))
+            if "image_matching" in values
+            else str(env.get("WANDERLENS_IMAGE_MATCHING", "")).lower() in {"1", "true", "yes", "on"}
+        ),
     )
 
 

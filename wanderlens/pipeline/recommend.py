@@ -214,6 +214,8 @@ def run_recommend(
     case_writer=None,
     session=None,
     diagnose: bool = False,
+    image_matching: bool = False,
+    image_fetcher=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -258,6 +260,13 @@ def run_recommend(
     if enricher is not None:
         candidates = [enrich_destination(conn, user_id, d, enricher) for d in candidates]
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
+    image_vectors = None
+    if image_matching or image_fetcher is not None:
+        from wanderlens.catalog.image_embeddings import ensure_destination_image_embeddings
+
+        image_vectors = ensure_destination_image_embeddings(
+            conn, candidates, embedder, fetch_urls=image_fetcher, session=session
+        )
     profile = load_profile(conn, user_id, embedding=taste)
     tags = taste_attribute_weights(profile.tags)
     feedback = load_feedback(conn, user_id)
@@ -286,6 +295,7 @@ def run_recommend(
         taste_facets=facets,
         visited_centers=centers,
         feedback=feedback,
+        image_vectors=image_vectors,
     )
 
     shortlist_climate: dict[str, float] = {}
@@ -329,6 +339,7 @@ def run_recommend(
         climate_weight=getattr(config, "climate_weight", 0.0),
         season=getattr(config, "season", "") or None,
         best_months=shortlist_best_months or None,
+        image_vectors=image_vectors,
     )
 
     if diagnose:

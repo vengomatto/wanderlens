@@ -218,6 +218,7 @@ def rank_destinations(
     climate_weight: float = 0.0,
     season: Optional[str] = None,
     best_months: Optional[dict[str, list]] = None,
+    image_vectors: Optional[dict] = None,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -250,8 +251,13 @@ def rank_destinations(
         best_trip_label = ""
         best_facet_similarity: Optional[float] = None
         if facets:
+            score_vector = (
+                image_vectors.get(destination.id)
+                if image_vectors and destination.id in image_vectors
+                else vector
+            )
             similarities = [
-                (float(np.dot(facet.vector, vector)) * getattr(facet, "weight", 1.0), facet)
+                (float(np.dot(facet.vector, score_vector)) * getattr(facet, "weight", 1.0), facet)
                 for facet in facets
             ]
             embedding_score, best = max(similarities, key=lambda item: item[0])

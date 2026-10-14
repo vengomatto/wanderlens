@@ -76,6 +76,11 @@ def test_ingest_vlm_flag_parses():
     assert args.vlm is True
 
 
+def test_recommend_image_matching_flag_parses():
+    parser = build_parser()
+    assert parser.parse_args(["recommend", "--image-matching"]).image_matching is True
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

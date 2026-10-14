@@ -97,6 +97,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print score diagnostics (component spread, collapsed-vector share, top mix)",
     )
+    p_rec.add_argument(
+        "--image-matching",
+        action="store_true",
+        help="score candidates by destination image vectors (network; off by default)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -249,6 +254,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         case_searcher=case_searcher,
         case_writer=case_writer,
         diagnose=args.diagnose,
+        image_matching=args.image_matching or config.image_matching,
     )
     if not recs:
         print("No recommendations.")

@@ -191,6 +191,16 @@ CREATE TABLE IF NOT EXISTS tag_cache (
     PRIMARY KEY (user_id, input_hash)
 );
 
+CREATE TABLE IF NOT EXISTS destination_image_embeddings (
+    destination_id  TEXT    NOT NULL,
+    model           TEXT    NOT NULL,
+    dim             INTEGER NOT NULL,
+    vector          BLOB    NOT NULL,
+    count           INTEGER,
+    fetched_at      TEXT,
+    PRIMARY KEY (destination_id, model)
+);
+
 CREATE TABLE IF NOT EXISTS destination_climate (
     destination_id  TEXT PRIMARY KEY,
     climate         TEXT,
