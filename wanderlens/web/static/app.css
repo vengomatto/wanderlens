@@ -642,6 +642,24 @@ main {
 }
 .brief-form button { grid-column: 1 / -1; justify-self: start; }
 
+/* Explore grid + view toggle */
+.rec-view-toggle { display: inline-flex; gap: 0.25rem; margin-left: auto; }
+.rec-view-toggle button {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.rec-view-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; padding: 0; list-style: none; }
+.rec-grid .rec { display: block; }
+.rec-grid .rec-hero { min-height: 180px; }
+.rec-grid .rec-gauge { display: none; }
+
 /* Estimated badge + profile facts */
 .estimated {
   font-size: 0.66rem;

@@ -114,6 +114,17 @@ class RecView:
 
 
 @dataclass
+class SavedView:
+    destination_id: str
+    name: str
+    country: str
+    action: str
+    reason: str = ""
+    description: str = ""
+    has_image: bool = False
+
+
+@dataclass
 class MediaImageRef:
     position: int
     filename: str
@@ -345,6 +356,33 @@ def trip_detail(conn: sqlite3.Connection, user_id: int, trip_id: int) -> Optiona
     ).fetchall()
     photos = [PhotoView(id=r["id"], name=Path(r["path"]).name) for r in rows]
     return {"trip": trip, "photos": photos, "attributes": trip.attributes}
+
+
+def saved_view(conn: sqlite3.Connection, user_id: int) -> list["SavedView"]:
+    run_id = latest_run_id(conn, user_id)
+    rows = conn.execute(
+        "SELECT f.destination_id, f.action, f.reason, r.destination_name, "
+        "r.destination_country, r.destination_description "
+        "FROM feedback f "
+        "LEFT JOIN recommendations r ON r.user_id = f.user_id "
+        "  AND r.destination_id = f.destination_id AND r.run_id = ? "
+        "WHERE f.user_id = ? AND f.action IN ('like', 'save') "
+        "ORDER BY f.action, f.destination_id",
+        (run_id, user_id),
+    ).fetchall()
+    with_images = _destinations_with_images(conn, [row["destination_id"] for row in rows])
+    return [
+        SavedView(
+            destination_id=row["destination_id"],
+            name=row["destination_name"] or row["destination_id"],
+            country=row["destination_country"] or "",
+            action=row["action"],
+            reason=row["reason"] or "",
+            description=row["destination_description"] or "",
+            has_image=row["destination_id"] in with_images,
+        )
+        for row in rows
+    ]
 
 
 def latest_run_id(conn: sqlite3.Connection, user_id: int) -> int:

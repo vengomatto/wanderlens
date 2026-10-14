@@ -214,6 +214,10 @@ places. It renders from the database only and never triggers ingestion or
 ranking — run `ingest` / `recommend` (or `ingest --tag`) first. Bound to
 localhost and single-user; front-end assets are vendored so it works offline.
 
+Recommendations can be viewed as an **image-tile grid** (with a list toggle), and
+a **Saved** board lists the places you liked or saved (with the reason you gave),
+straight from the database.
+
 Recommendations now carry **pictures and a real destination page**. When you run
 `recommend`, each recommended Destination also fetches a Wikipedia image, an
 expanded description, and a region shape from free, keyless sources, cached under

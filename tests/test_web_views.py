@@ -350,6 +350,17 @@ def test_destination_detail_has_photo_links(tmp_path):
     assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
 
 
+def test_saved_view_lists_likes(tmp_path):
+    conn = _seed(tmp_path)
+    views.record_feedback(conn, 1, "wy:algarve", "save", "a good base")
+
+    items = views.saved_view(conn, 1)
+
+    assert [item.destination_id for item in items] == ["wy:algarve"]
+    assert items[0].name == "Algarve"
+    assert items[0].reason == "a good base"
+
+
 def test_recommendations_use_latest_run_and_mark_new(tmp_path):
     conn = _seed(tmp_path)
     conn.execute(

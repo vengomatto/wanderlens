@@ -78,6 +78,17 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             conn.close()
         return render(request, "recommendations.html", active="recommendations", recs=recs)
 
+    @app.get("/saved", response_class=HTMLResponse)
+    def saved(request: Request) -> HTMLResponse:
+        conn = connect(app.state.config.db_path)
+        try:
+            _open(conn)
+            user_id = views.resolve_user(conn, app.state.user_name)
+            items = views.saved_view(conn, user_id) if user_id is not None else []
+        finally:
+            conn.close()
+        return render(request, "saved.html", active="saved", items=items)
+
     @app.get("/trips/{trip_id}", response_class=HTMLResponse)
     def trip(request: Request, trip_id: int) -> HTMLResponse:
         conn = connect(app.state.config.db_path)

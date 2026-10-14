@@ -209,6 +209,23 @@ def test_feedback_post_redirects_without_htmx(tmp_path):
     assert response.status_code == 303
 
 
+def test_recommendations_grid_toggle(tmp_path):
+    config = _seed(_config(tmp_path))
+    body = _client(config).get("/recommendations").text
+    assert "rec-view-toggle" in body
+
+
+def test_saved_page_renders_and_lists_saved(tmp_path):
+    config = _seed(_config(tmp_path))
+    client = _client(config)
+
+    assert "Nothing saved yet" in client.get("/saved").text
+
+    client.post("/destinations/wy:algarve/feedback?action=save", headers={"HX-Request": "true"})
+    body = client.get("/saved").text
+    assert "Algarve" in body
+
+
 def test_recommendations_page_renders(tmp_path):
     config = _seed(_config(tmp_path))
     response = _client(config).get("/recommendations")

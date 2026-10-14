@@ -12,12 +12,16 @@
   <p>Run <code>wanderlens recommend --count 5</code> and reload this page.</p>
 </div>
 {% else %}
-<div x-data="{ q: '' }">
+<div x-data="{ q: '', view: 'grid' }">
   <div class="toolbar">
     <input type="search" placeholder="Filter by name or country…" x-model="q" aria-label="Filter">
     <span class="muted">{{ recs | length }} places</span>
+    <span class="rec-view-toggle">
+      <button type="button" :class="{ active: view === 'grid' }" @click="view = 'grid'">Grid</button>
+      <button type="button" :class="{ active: view === 'list' }" @click="view = 'list'">List</button>
+    </span>
   </div>
-  <ol class="rec-list">
+  <ol class="rec-list" :class="view === 'grid' ? 'rec-grid' : ''">
     {% for rec in recs %}
     <li class="rec" data-search="{{ (rec.name ~ ' ' ~ rec.country) | lower }}" x-show="q === '' || $el.dataset.search.includes(q.toLowerCase())">
       <a class="rec-hero" href="/destinations/{{ rec.destination_id | urlencode }}">
