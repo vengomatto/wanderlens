@@ -176,7 +176,9 @@ def build_catalog_for(
         from wanderlens.catalog.wikivoyage import build_wikivoyage_catalog
 
         names = country_names_for_codes(config.catalog_path / "countryInfo.txt", country_codes)
-        catalog = build_wikivoyage_catalog(list(names.values()))
+        catalog = build_wikivoyage_catalog(
+            list(names.values()), min_extract_chars=int(getattr(config, "catalog_min_extract", 0))
+        )
         if len(catalog):
             catalog.save(cache)
             return catalog
@@ -189,8 +191,9 @@ def build_catalog_for(
 def default_catalog(
     config, limit: int = 150, enrich: bool = True, providers=None
 ) -> JsonCatalog:
+    countries = list(getattr(config, "catalog_countries", []) or DEFAULT_CANDIDATE_COUNTRIES)
     return build_catalog_for(
-        config, DEFAULT_CANDIDATE_COUNTRIES, "destinations.json", providers=providers, limit=limit
+        config, countries, "destinations.json", providers=providers, limit=limit
     )
 
 

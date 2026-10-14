@@ -75,6 +75,63 @@ def test_destination_round_trip_keeps_granularity():
     assert destination_from_dict(destination_to_dict(original)).granularity == "region"
 
 
+WIKITEXT_V2 = """
+== Regions ==
+* [[Andalusia]]
+== Cities ==
+* [[Madrid]]
+* {{marker | name=Toledo | lat=39.86 | long=-4.02 | wikidata=Q5836 }}
+== Other destinations ==
+* [[Costa del Sol]]
+* [[Hungary]]
+* [[Spain]]
+"""
+
+
+def test_section_entries_parse_templates_and_drop_noise():
+    from wanderlens.catalog.wikivoyage import country_destination_entries
+
+    entries = country_destination_entries(WIKITEXT_V2, country="Spain", foreign={"Spain", "Hungary"})
+    by_title = {e["title"]: e for e in entries}
+
+    assert set(by_title) == {"Andalusia", "Madrid", "Toledo", "Costa del Sol"}
+    assert by_title["Toledo"]["granularity"] == "city"
+    assert by_title["Toledo"]["lat"] == 39.86
+    assert by_title["Toledo"]["qid"] == "Q5836"
+    assert by_title["Costa del Sol"]["granularity"] == "other"
+
+
+def test_build_country_destinations_records_qid_and_uses_template_coords():
+    pages = {
+        "1": {"title": "Madrid", "coordinates": [{"lat": 40.4, "lon": -3.7}], "extract": "Capital.", "pageprops": {"wikibase_item": "Q2807"}},
+        "2": {"title": "Toledo", "extract": "Old city.", "pageprops": {"wikibase_item": "Q5836"}},
+        "3": {"title": "Costa del Sol", "coordinates": [{"lat": 36.5, "lon": -4.9}], "extract": "A coastal region."},
+        "4": {"title": "Andalusia"},
+    }
+    session = WikiSession(WIKITEXT_V2, pages)
+
+    destinations = build_country_destinations("Spain", session=session)
+
+    by_name = {d.name: d for d in destinations}
+    assert set(by_name) == {"Madrid", "Toledo", "Costa del Sol"}
+    assert by_name["Madrid"].wikidata_id == "Q2807"
+    assert by_name["Toledo"].lat == 39.86  # from the marker template
+    assert by_name["Toledo"].wikidata_id == "Q5836"
+
+
+def test_quality_gate_drops_short_extracts():
+    pages = {
+        "1": {"title": "Madrid", "coordinates": [{"lat": 40.4, "lon": -3.7}], "extract": "Short."},
+        "2": {"title": "Costa del Sol", "coordinates": [{"lat": 36.5, "lon": -4.9}], "extract": "A coastal region."},
+        "3": {"title": "Andalusia"},
+    }
+    session = WikiSession(WIKITEXT_V2, pages)
+
+    destinations = build_country_destinations("Spain", session=session, min_extract_chars=10)
+
+    assert {d.name for d in destinations} == {"Costa del Sol"}
+
+
 class StubProvider:
     name = "stub"
 

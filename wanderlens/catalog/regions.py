@@ -66,12 +66,14 @@ def _precise_geometry(destination: Destination, session, timeout: int) -> Option
 
 
 def _wikidata_geometry(destination: Destination, session, timeout: int) -> Optional[dict]:
-    if not destination.id.startswith("wd:"):
+    qid = destination.wikidata_id or (
+        destination.id[3:] if destination.id.startswith("wd:") else ""
+    )
+    if not qid:
         return None
     import requests
 
     session = session or requests
-    qid = destination.id[3:]
     try:
         response = session.get(
             WIKIDATA_API,

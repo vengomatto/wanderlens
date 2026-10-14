@@ -36,6 +36,7 @@ class Destination:
     attributes: list[str] = field(default_factory=list)
     description: str = ""
     granularity: str = ""
+    wikidata_id: str = ""
 
 
 @dataclass

@@ -66,6 +66,7 @@ def destination_to_dict(destination: Destination) -> dict:
         "attributes": list(destination.attributes),
         "description": destination.description,
         "granularity": destination.granularity,
+        "wikidata_id": destination.wikidata_id,
     }
 
 
@@ -80,6 +81,7 @@ def destination_from_dict(data: dict) -> Destination:
             attributes=list(data.get("attributes", [])),
             description=data.get("description", ""),
             granularity=data.get("granularity", ""),
+            wikidata_id=data.get("wikidata_id", ""),
         )
     )
 

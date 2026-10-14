@@ -49,6 +49,8 @@ class Config:
     tag_provider: str = "clip"
     image_matching: bool = False
     calibrate: bool = False
+    catalog_countries: list[str] = field(default_factory=list)
+    catalog_min_extract: int = 0
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -207,6 +209,12 @@ def load_config(
             bool(values.get("calibrate"))
             if "calibrate" in values
             else str(env.get("WANDERLENS_CALIBRATE", "")).lower() in {"1", "true", "yes", "on"}
+        ),
+        catalog_countries=_string_list(
+            values.get("catalog_countries") or env.get("WANDERLENS_CATALOG_COUNTRIES")
+        ),
+        catalog_min_extract=int(
+            values.get("catalog_min_extract") or env.get("WANDERLENS_CATALOG_MIN_EXTRACT") or 0
         ),
     )
 

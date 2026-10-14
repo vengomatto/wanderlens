@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from typing import Iterable, Optional
 
 from wanderlens.catalog.destinations import JsonCatalog
@@ -12,34 +11,90 @@ USER_AGENT = "wanderlens/0.1 (+https://github.com/Vengomatto/wanderlens)"
 
 _SECTIONS = (("Regions", "region"), ("Cities", "city"), ("Other destinations", "other"))
 _SKIP_PREFIXES = ("file:", "image:", "category:")
+_TEMPLATE_RE = re.compile(
+    r"\{\{\s*(?:marker|listing|see|do|go|sleep|eat|drink|buy|around)\b([^}]*)\}\}", re.I
+)
+_LINK_RE = re.compile(r"\[\[([^\]|#]+)")
 
 
-def _section_links(wikitext: str, section: str) -> list[str]:
+def _section_body(wikitext: str, section: str) -> str:
     match = re.search(
         rf"==+\s*{re.escape(section)}\s*==+(.*?)(?=\n==[^=]|\Z)", wikitext, re.S | re.I
     )
-    if not match:
-        return []
-    titles = []
-    for link in re.findall(r"\[\[([^\]|#]+)", match.group(1)):
-        title = link.strip()
-        if not title or title.lower().startswith(_SKIP_PREFIXES):
+    return match.group(1) if match else ""
+
+
+def _to_float(value: Optional[str]) -> Optional[float]:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _template_entry(template: str, granularity: str) -> Optional[dict]:
+    body = template[2:-2] if template.endswith("}}") else template
+    params: dict[str, str] = {}
+    for part in body.split("|"):
+        if "=" in part:
+            key, val = part.split("=", 1)
+            params[key.strip().lower()] = val.strip()
+    title = params.get("name") or params.get("title")
+    if not title:
+        return None
+    return {
+        "title": title,
+        "granularity": granularity,
+        "lat": _to_float(params.get("lat")),
+        "lon": _to_float(params.get("long") or params.get("lon")),
+        "qid": params.get("wikidata", "").strip(),
+    }
+
+
+def parse_section_entries(body: str, granularity: str) -> list[dict]:
+    """List-item and marker/listing entries in a section body."""
+    entries: list[dict] = []
+    for line in body.splitlines():
+        if not re.match(r"^\s*[*#]", line):
             continue
-        titles.append(title)
-    return titles
+        template = _TEMPLATE_RE.search(line)
+        if template:
+            entry = _template_entry(template.group(0), granularity)
+            if entry:
+                entries.append(entry)
+                continue
+        link = _LINK_RE.search(line)
+        if link:
+            title = link.group(1).strip()
+            if title and not title.lower().startswith(_SKIP_PREFIXES):
+                entries.append(
+                    {"title": title, "granularity": granularity, "lat": None, "lon": None, "qid": ""}
+                )
+    return entries
+
+
+def country_destination_entries(
+    wikitext: str, country: str = "", foreign: Optional[set[str]] = None
+) -> list[dict]:
+    """Deduplicated entries across sections, granularity from the section."""
+    foreign = {name.lower() for name in (foreign or set())}
+    if country:
+        foreign.add(country.lower())
+    entries: list[dict] = []
+    seen: set[str] = set()
+    for section, granularity in _SECTIONS:
+        for entry in parse_section_entries(_section_body(wikitext, section), granularity):
+            title = entry["title"]
+            key = title.lower()
+            if key in seen or key in foreign:
+                continue
+            seen.add(key)
+            entries.append(entry)
+    return entries
 
 
 def country_destination_titles(wikitext: str) -> list[tuple[str, str]]:
-    """Return (title, granularity) pairs from a country page's sections."""
-    pairs: list[tuple[str, str]] = []
-    seen: set[str] = set()
-    for section, granularity in _SECTIONS:
-        for title in _section_links(wikitext, section):
-            if title in seen:
-                continue
-            seen.add(title)
-            pairs.append((title, granularity))
-    return pairs
+    """(title, granularity) pairs from a country page's sections."""
+    return [(e["title"], e["granularity"]) for e in country_destination_entries(wikitext)]
 
 
 def _fetch_wikitext(page: str, session=None, timeout: int = 30) -> str:
@@ -68,7 +123,7 @@ def _fetch_pages(titles: list[str], session=None, timeout: int = 30, batch: int 
             params={
                 "action": "query",
                 "titles": "|".join(chunk),
-                "prop": "coordinates|extracts",
+                "prop": "coordinates|extracts|pageprops",
                 "exintro": 1,
                 "explaintext": 1,
                 "redirects": 1,
@@ -82,39 +137,74 @@ def _fetch_pages(titles: list[str], session=None, timeout: int = 30, batch: int 
     return pages
 
 
-def build_country_destinations(country: str, session=None, timeout: int = 30) -> list[Destination]:
+def build_country_destinations(
+    country: str,
+    session=None,
+    timeout: int = 30,
+    min_extract_chars: int = 0,
+    foreign: Optional[set[str]] = None,
+    log=None,
+) -> list[Destination]:
     wikitext = _fetch_wikitext(country, session=session, timeout=timeout)
-    pairs = country_destination_titles(wikitext)
-    if not pairs:
+    entries = country_destination_entries(wikitext, country=country, foreign=foreign)
+    if not entries:
         return []
-    granularity = {title: gran for title, gran in pairs}
+    by_title = {entry["title"]: entry for entry in entries}
+
     destinations: list[Destination] = []
-    for page in _fetch_pages([title for title, _ in pairs], session=session, timeout=timeout):
+    for page in _fetch_pages([entry["title"] for entry in entries], session=session, timeout=timeout):
+        title = page.get("title", "")
+        entry = by_title.get(title) or by_title.get(title.split(" (")[0], {})
         coordinates = page.get("coordinates") or []
-        if not coordinates:
+        lat = float(coordinates[0]["lat"]) if coordinates else entry.get("lat")
+        lon = float(coordinates[0]["lon"]) if coordinates else entry.get("lon")
+        if lat is None or lon is None:
+            if log is not None:
+                log.append((title, "no coordinates"))
             continue
-        title = page["title"]
-        gran = granularity.get(title) or granularity.get(title.split(" (")[0]) or "other"
         extract = " ".join((page.get("extract") or "").split())[:300]
+        if min_extract_chars and len(extract) < min_extract_chars:
+            if log is not None:
+                log.append((title, "short extract"))
+            continue
+        qid = (page.get("pageprops") or {}).get("wikibase_item") or entry.get("qid", "")
         destinations.append(
             Destination(
                 id=f"wv:{title}",
                 name=title,
-                lat=float(coordinates[0]["lat"]),
-                lon=float(coordinates[0]["lon"]),
+                lat=lat,
+                lon=lon,
                 country=country,
                 description=extract,
-                granularity=gran,
+                granularity=entry.get("granularity", "other"),
+                wikidata_id=qid,
             )
         )
     return destinations
 
 
-def build_wikivoyage_catalog(countries: Iterable[str], session=None, timeout: int = 30) -> JsonCatalog:
+def build_wikivoyage_catalog(
+    countries: Iterable[str],
+    session=None,
+    timeout: int = 30,
+    min_extract_chars: int = 0,
+    log=None,
+) -> JsonCatalog:
+    countries = list(countries)
+    foreign = set(countries)
     destinations: list[Destination] = []
     for country in countries:
         try:
-            destinations.extend(build_country_destinations(country, session=session, timeout=timeout))
+            destinations.extend(
+                build_country_destinations(
+                    country,
+                    session=session,
+                    timeout=timeout,
+                    min_extract_chars=min_extract_chars,
+                    foreign=foreign,
+                    log=log,
+                )
+            )
         except Exception:
             continue
     return JsonCatalog(destinations)

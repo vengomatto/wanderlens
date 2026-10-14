@@ -292,6 +292,15 @@ reverse-geocoding of visited trips.
 WANDERLENS_CATALOG_SOURCE=wikivoyage   # default; or "geonames"
 ```
 
+The Wikivoyage parser reads each section's **list items and marker/listing
+templates** (taking coordinates and Wikidata QIDs directly), assigns granularity
+from the section, and drops links to the parent country or other countries. Each
+Destination records its **Wikidata QID** when available, so media and boundary
+lookups use the exact item rather than a name search (`regions.py` now runs the
+Wikidata P402 path for it). Widen coverage with
+`WANDERLENS_CATALOG_COUNTRIES=ES,PT,MA,TH` and gate thin entries with
+`WANDERLENS_CATALOG_MIN_EXTRACT=<chars>` (default off).
+
 ## Testing
 
 ```bash
