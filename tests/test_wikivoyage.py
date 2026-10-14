@@ -88,6 +88,15 @@ WIKITEXT_V2 = """
 """
 
 
+def test_clean_title_handles_malformed_and_alias():
+    from wanderlens.catalog.wikivoyage import _clean_title
+
+    assert _clean_title("[[Sintra") == "Sintra"
+    assert _clean_title("[[Naples|Napoli]]") == "Napoli"
+    assert _clean_title("Rome") == "Rome"
+    assert _clean_title("A#See") == "A"
+
+
 def test_marker_name_markup_is_cleaned():
     from wanderlens.catalog.wikivoyage import parse_section_entries
 

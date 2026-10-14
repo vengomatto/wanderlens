@@ -42,10 +42,9 @@ def _to_float(value: Optional[str]) -> Optional[float]:
 
 def _clean_title(value: str) -> str:
     """Strip wiki link markup and fragments from a marker's name value."""
-    value = (value or "").strip()
-    link = re.search(r"\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]", value)
-    if link:
-        value = (link.group(2) or link.group(1)).strip()
+    value = (value or "").strip().replace("[[", "").replace("]]", "")
+    if "|" in value:
+        value = value.split("|", 1)[1]
     return value.split("#", 1)[0].strip()
 
 
