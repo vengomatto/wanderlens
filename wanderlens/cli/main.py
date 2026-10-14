@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-run vision tagging even if subjects are already stored",
     )
+    p_ingest.add_argument(
+        "--estimate",
+        action="store_true",
+        help="with --tag, print the image count and estimated cost without sending",
+    )
     p_ingest.set_defaults(func=cmd_ingest)
 
     p_profile = sub.add_parser("profile", help="manage the taste profile")
@@ -144,6 +149,12 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if args.photos:
         config.photos_dir = config.photos_dir.__class__(args.photos)
     count = run_ingest(config, user_name=args.user)
+
+    if args.tag and args.estimate:
+        from wanderlens.pipeline.profile import estimate_tagging
+
+        print(estimate_tagging(config, user_name=args.user))
+        return 0
 
     vision = None
     if args.tag:

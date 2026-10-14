@@ -186,6 +186,46 @@ def test_unreadable_photo_is_skipped_and_counted(tmp_path):
     assert stats["photos_skipped"] == 1
 
 
+def test_tag_cache_avoids_resend(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)
+    vision = FakeVision(["coastal cliffs"])
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+    calls = vision.calls
+    assert calls > 0
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+    assert vision.calls == calls, "cached tag result should not re-send photos"
+
+
+def test_new_trip_is_tagged(tmp_path):
+    config = _config(tmp_path)
+    _seed(config)
+    vision = FakeVision(["coastal cliffs"])
+
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+    calls = vision.calls
+
+    _write(config.photos_dir / "d.jpg", "2026:03:01 09:00:00")
+    run_ingest(config)
+    run_profile(config, embedder=FakeEmbedder(), vision=vision, reverse_geocoder=_italy)
+
+    assert vision.calls > calls, "a new trip should be tagged automatically"
+
+
+def test_estimate_tagging_reports_without_sending(tmp_path):
+    from wanderlens.pipeline.profile import estimate_tagging
+
+    config = _config(tmp_path)
+    _seed(config)
+
+    text = estimate_tagging(config)
+
+    assert "image(s)" in text
+    assert "estimated" in text
+
+
 def test_profile_uses_enricher_for_structured_attributes(tmp_path):
     config = _config(tmp_path)
     _seed(config)

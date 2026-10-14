@@ -64,6 +64,12 @@ def test_recommend_refresh_media_flag_parses():
     assert parser.parse_args(["recommend", "--refresh-media"]).refresh_media is True
 
 
+def test_ingest_estimate_flag_parses():
+    parser = build_parser()
+    args = parser.parse_args(["ingest", "--tag", "--estimate"])
+    assert args.estimate is True
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

@@ -211,8 +211,12 @@ day-by-day itinerary with the LLM (pinned prompt, cached, marked "AI-generated",
 with sources) — use `--no-llm` to skip it, `--refresh` to rebuild.
 
 `--tag` sends a small sample of photos (~3 per trip) to the configured vision
-model. Without it, subject tags are skipped; geography and aesthetics are still
-computed locally.
+model. Each image is **downscaled to 512 px with EXIF (GPS/time) stripped** at
+low detail, and the result is **cached per sample** so re-runs do not re-send
+known photos; new trips are tagged automatically. Use `ingest --tag --estimate`
+to see the image count and a rough cost without sending anything. Without
+`--tag`, subject tags are skipped; geography and aesthetics are still computed
+locally.
 
 Visited areas are excluded from recommendations by **proximity** (default 60 km
 around each trip), not by country — so one Trentino trip does not remove all of

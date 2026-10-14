@@ -181,6 +181,16 @@ CREATE TABLE IF NOT EXISTS trip_weather (
     PRIMARY KEY (user_id, trip_id)
 );
 
+CREATE TABLE IF NOT EXISTS tag_cache (
+    user_id         INTEGER NOT NULL,
+    input_hash      TEXT    NOT NULL,
+    model           TEXT,
+    prompt_version  TEXT,
+    tags            TEXT,
+    created_at      TEXT,
+    PRIMARY KEY (user_id, input_hash)
+);
+
 CREATE TABLE IF NOT EXISTS destination_climate (
     destination_id  TEXT PRIMARY KEY,
     climate         TEXT,

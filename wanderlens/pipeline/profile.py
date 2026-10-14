@@ -119,8 +119,12 @@ def _store_subjects(
     vision,
     sample_per_trip: int,
     enricher=None,
+    retag: bool = False,
 ) -> None:
+    import hashlib
+    import json
     from collections import Counter
+    from datetime import datetime, timezone
 
     from wanderlens.core.vocabulary import canonicalize
     from wanderlens.pipeline.enrichment import enrich_trip_attributes
@@ -130,13 +134,43 @@ def _store_subjects(
         "DELETE FROM profile_entries WHERE user_id = ? AND factor = 'subjects'", (user_id,)
     )
 
+    model = getattr(vision, "model", "")
+    prompt = getattr(vision, "prompt_version", "vision-v1")
     per_trip: dict[int, set[str]] = {}
     for trip in trips:
         sample = sample_trip_photos(trip.photos, sample_per_trip)
-        try:
-            tags = vision.describe([p.path for p in sample])
-        except Exception:
-            tags = []
+        digest = hashlib.sha256(
+            "|".join(sorted(p.sha256 for p in sample)).encode()
+        ).hexdigest()
+        tags = None
+        if not retag:
+            row = conn.execute(
+                "SELECT tags FROM tag_cache WHERE user_id = ? AND input_hash = ?",
+                (user_id, digest),
+            ).fetchone()
+            if row is not None:
+                try:
+                    tags = json.loads(row["tags"])
+                except (ValueError, TypeError):
+                    tags = None
+        if tags is None:
+            try:
+                tags = vision.describe([p.path for p in sample])
+            except Exception:
+                tags = []
+            conn.execute(
+                "INSERT OR REPLACE INTO tag_cache "
+                "(user_id, input_hash, model, prompt_version, tags, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    digest,
+                    model,
+                    prompt,
+                    json.dumps(tags),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
         attributes: set[str] = set()
         for tag in tags:
             attributes.update(canonicalize(tag))
@@ -201,15 +235,29 @@ def run_profile(
         stats["photos_skipped"] = skipped
 
     if vision is not None:
-        existing_subjects = conn.execute(
-            "SELECT COUNT(*) FROM profile_entries WHERE user_id = ? AND factor = 'subjects'",
-            (user_id,),
-        ).fetchone()[0]
-        if retag or existing_subjects == 0:
-            _store_subjects(conn, user_id, trips, vision, sample_per_trip, enricher)
+        _store_subjects(
+            conn, user_id, trips, vision, sample_per_trip, enricher, retag=retag
+        )
 
     conn.commit()
     return trips
+
+
+def estimate_tagging(config: Config, user_name: str = "owner", sample_per_trip: int = 3) -> str:
+    """A dry-run: how many images tagging would send and a rough cost estimate."""
+    from wanderlens.pipeline.ingest import get_or_create_user
+
+    conn = connect(config.db_path)
+    init_db(conn)
+    user_id = get_or_create_user(conn, user_name)
+    photos = load_photos(conn, user_id)
+    trips = cluster_into_trips(photos)
+    images = sum(len(sample_trip_photos(trip, sample_per_trip)) for trip in trips)
+    estimated_usd = images * 1500 / 1_000_000 * 0.15
+    return (
+        f"Tagging would send {images} image(s) across {len(trips)} trip(s); "
+        f"estimated cost ≈ ${estimated_usd:.4f} (low detail, approximate)."
+    )
 
 
 def show_profile(config: Config, user_name: str = "owner") -> str:

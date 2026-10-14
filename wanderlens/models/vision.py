@@ -2,12 +2,26 @@ from __future__ import annotations
 
 import base64
 import re
+from io import BytesIO
 from pathlib import Path
 from typing import Sequence
 
 import requests
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+MAX_IMAGE_PX = 512
+
+
+def prepare_image(path: str, max_px: int = MAX_IMAGE_PX) -> bytes:
+    """A small, EXIF-stripped JPEG for the vision model (no GPS/time leak)."""
+    from PIL import Image, ImageOps
+
+    with Image.open(path) as image:
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        image.thumbnail((max_px, max_px))
+        buffer = BytesIO()
+        image.save(buffer, "JPEG", quality=80)
+    return buffer.getvalue()
 
 _SYSTEM = (
     "You are a travel photo analyst. For the provided photos, respond with a "
@@ -30,8 +44,7 @@ class HostedVLM:
         self.timeout = timeout
 
     def _encode(self, path: str) -> str:
-        data = Path(path).read_bytes()
-        return base64.b64encode(data).decode("ascii")
+        return base64.b64encode(prepare_image(path)).decode("ascii")
 
     def describe(self, paths: Sequence[str]) -> list[str]:
         if not self.api_key:
@@ -41,7 +54,10 @@ class HostedVLM:
             content.append(
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{self._encode(path)}"},
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{self._encode(path)}",
+                        "detail": "low",
+                    },
                 }
             )
         response = requests.post(
