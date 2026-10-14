@@ -207,13 +207,18 @@ of at least a configured length, logging what it drops.
 - **THEN** it is dropped from the catalog
 
 ### Requirement: Clean marker values
-The system SHALL strip wiki markup from a parsed marker/listing `name` (link
-brackets, an optional display alias, and any `#fragment`) before it becomes a
-title, id, or lookup key, so names and ids are clean.
+The system SHALL strip wiki markup from a parsed marker/listing `name` — link
+brackets (even when the link is unclosed), an optional display alias, and any
+`#fragment` — before it becomes a title, id, or lookup key, so names and ids are
+clean.
 
 #### Scenario: Bracketed name cleaned
 - **WHEN** a marker's name is given as `[[Rome]]` or `[[Rome|Roma]]`
 - **THEN** the resulting title is `Rome` or `Roma` respectively
+
+#### Scenario: Unclosed link cleaned
+- **WHEN** a marker's name is given as an unclosed link such as `[[Sintra`
+- **THEN** the resulting title is `Sintra`
 
 ### Requirement: Quality gate logs drops
 The system SHALL, when the catalog quality gate is enabled, drop entries without
