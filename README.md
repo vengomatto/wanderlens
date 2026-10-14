@@ -180,6 +180,11 @@ source by default; add Unsplash / Pexels by setting `WANDERLENS_UNSPLASH_KEY` /
 `WANDERLENS_PEXELS_KEY` (and listing them in `WANDERLENS_MEDIA_SOURCES`), and add
 diary links with `WANDERLENS_TRAVEL_BLOGS=url1,url2`.
 
+**Trip brief:** `wanderlens brief --adults 2 --children 1 --season summer
+--max-travel-km 1200 --home 52.5,13.4` (or the panel on the taste page) stores
+your party, pace, season, travel range, and budget; recommendations exclude places
+beyond your travel range and use your season.
+
 **Weather awareness:** with `climate: true` (or `WANDERLENS_CLIMATE=1`),
 `wanderlens` derives each trip's historical weather (Open-Meteo, keyless),
 aggregates a climate preference into your profile, and computes each destination's

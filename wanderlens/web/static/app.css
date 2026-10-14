@@ -630,6 +630,17 @@ main {
   margin-left: 0.35rem;
   vertical-align: middle;
 }
+.brief-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; align-items: end; }
+.brief-form label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
+.brief-form input, .brief-form select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--ink);
+}
+.brief-form button { grid-column: 1 / -1; justify-self: start; }
 
 /* Estimated badge + profile facts */
 .estimated {

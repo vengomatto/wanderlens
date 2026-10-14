@@ -149,6 +149,38 @@ def test_profile_page_renders(tmp_path):
     assert "/photos/u1-p0" in body
 
 
+def test_brief_panel_and_save(tmp_path):
+    import sqlite3
+
+    config = _seed(_config(tmp_path))
+    client = _client(config)
+
+    assert "Trip brief" in client.get("/").text
+
+    response = client.post(
+        "/brief",
+        data={
+            "adults": "2",
+            "children": "1",
+            "pace": "relaxed",
+            "season": "summer",
+            "max_travel_km": "1000",
+            "home": "44.1,9.6",
+            "budget": "medium",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    conn = sqlite3.connect(config.db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM traveller_brief WHERE user_id = 1").fetchone()
+    assert row["adults"] == 2
+    assert row["children"] == 1
+    assert row["season"] == "summer"
+    assert row["max_travel_km"] == 1000.0
+
+
 def test_feedback_post_records_and_returns_fragment(tmp_path):
     import sqlite3
 

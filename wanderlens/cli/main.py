@@ -154,6 +154,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_fb.add_argument("--reason", default=None, help="optional reason for the action")
     p_fb.set_defaults(func=cmd_feedback)
 
+    p_brief = sub.add_parser("brief", help="view or set the traveller brief")
+    p_brief.add_argument("--adults", type=int, default=None)
+    p_brief.add_argument("--children", type=int, default=None)
+    p_brief.add_argument("--pace", choices=["relaxed", "normal", "packed"], default=None)
+    p_brief.add_argument(
+        "--season", choices=["spring", "summer", "autumn", "winter"], default=None
+    )
+    p_brief.add_argument("--max-travel-km", type=float, default=None)
+    p_brief.add_argument("--home", default=None, help="home location as LAT,LON")
+    p_brief.add_argument("--budget", choices=["low", "medium", "high"], default=None)
+    p_brief.set_defaults(func=cmd_brief)
+
     p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
     p_serve.add_argument("--host", default="127.0.0.1", help="bind host (localhost only by default)")
     p_serve.add_argument("--port", type=int, default=8000, help="port to listen on")
@@ -390,6 +402,48 @@ def cmd_serve(args: argparse.Namespace) -> int:
     app = create_app(config, user_name=args.user)
     print(f"Serving Wanderlens on http://{args.host}:{args.port} (Ctrl-C to stop)")
     uvicorn.run(app, host=args.host, port=args.port)
+    return 0
+
+
+def cmd_brief(args: argparse.Namespace) -> int:
+    from wanderlens.db import connect, init_db
+    from wanderlens.pipeline.brief import load_brief, save_brief
+    from wanderlens.pipeline.ingest import get_or_create_user
+
+    config = load_config(args.config)
+    conn = connect(config.db_path)
+    init_db(conn)
+    user_id = get_or_create_user(conn, args.user)
+
+    fields = {
+        "adults": args.adults,
+        "children": args.children,
+        "pace": args.pace,
+        "season": args.season,
+        "max_travel_km": args.max_travel_km,
+        "budget": args.budget,
+    }
+    if args.home:
+        try:
+            lat, lon = (float(x) for x in args.home.split(","))
+        except ValueError:
+            print("--home must be LAT,LON")
+            return 2
+        fields["home_lat"] = lat
+        fields["home_lon"] = lon
+
+    if any(value is not None for value in fields.values()):
+        save_brief(conn, user_id, **fields)
+
+    brief = load_brief(conn, user_id)
+    if not brief:
+        print(
+            "No trip brief set. Use --adults, --children, --pace, --season, "
+            "--max-travel-km, --home LAT,LON, --budget."
+        )
+        return 0
+    for key in sorted(brief):
+        print(f"{key}: {brief[key]}")
     return 0
 
 

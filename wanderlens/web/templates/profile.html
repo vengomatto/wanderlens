@@ -41,6 +41,33 @@
   </section>
 </div>
 
+<section class="card brief-card">
+  <h2>Trip brief</h2>
+  <p class="muted">Party, pace, range, and season — used to shape recommendations.</p>
+  <form method="post" action="/brief" class="brief-form">
+    <label>Adults <input type="number" name="adults" min="0" value="{{ view.brief.get('adults', '') }}"></label>
+    <label>Children <input type="number" name="children" min="0" value="{{ view.brief.get('children', '') }}"></label>
+    <label>Pace
+      <select name="pace">
+        {% for p in ['', 'relaxed', 'normal', 'packed'] %}<option value="{{ p }}"{% if view.brief.get('pace') == p %} selected{% endif %}>{{ p or '—' }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Season
+      <select name="season">
+        {% for s in ['', 'spring', 'summer', 'autumn', 'winter'] %}<option value="{{ s }}"{% if view.brief.get('season') == s %} selected{% endif %}>{{ s or '—' }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Max travel (km) <input type="number" name="max_travel_km" min="0" step="100" value="{{ view.brief.get('max_travel_km', '') }}"></label>
+    <label>Home (lat,lon) <input type="text" name="home" placeholder="44.1,9.6" value="{% if view.brief.get('home_lat') is not none %}{{ view.brief.get('home_lat') }},{{ view.brief.get('home_lon') }}{% endif %}"></label>
+    <label>Budget
+      <select name="budget">
+        {% for b in ['', 'low', 'medium', 'high'] %}<option value="{{ b }}"{% if view.brief.get('budget') == b %} selected{% endif %}>{{ b or '—' }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="fb fb-like active" type="submit">Save brief</button>
+  </form>
+</section>
+
 <section class="card">
   <h2>Trips</h2>
   <div class="trip-grid">

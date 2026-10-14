@@ -151,6 +151,40 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             )
         return RedirectResponse(url=f"/destinations/{destination_id}", status_code=303)
 
+    @app.post("/brief")
+    async def save_traveller_brief(request: Request):
+        from urllib.parse import parse_qs
+
+        from wanderlens.pipeline.brief import save_brief
+
+        raw = (await request.body()).decode("utf-8")
+        form = {key: values[0] for key, values in parse_qs(raw).items()}
+        conn = connect(app.state.config.db_path)
+        try:
+            _open(conn)
+            user_id = views.resolve_user(conn, app.state.user_name)
+            if user_id is not None:
+                fields: dict = {}
+                if str(form.get("adults", "")).strip():
+                    fields["adults"] = int(form["adults"])
+                if str(form.get("children", "")).strip():
+                    fields["children"] = int(form["children"])
+                for key in ("pace", "season", "budget"):
+                    value = str(form.get(key, "")).strip()
+                    if value:
+                        fields[key] = value
+                if str(form.get("max_travel_km", "")).strip():
+                    fields["max_travel_km"] = float(form["max_travel_km"])
+                home = str(form.get("home", "")).strip()
+                if "," in home:
+                    lat, lon = (float(part) for part in home.split(",", 1))
+                    fields["home_lat"] = lat
+                    fields["home_lon"] = lon
+                save_brief(conn, user_id, **fields)
+        finally:
+            conn.close()
+        return RedirectResponse(url="/", status_code=303)
+
     @app.get("/destination-image/{destination_id}/{position}")
     def destination_image(request: Request, destination_id: str, position: int) -> FileResponse:
         conn = connect(app.state.config.db_path)

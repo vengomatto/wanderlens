@@ -298,7 +298,11 @@ def run_recommend(
     candidates = catalog.candidates()
     centers = load_trip_centers(conn, user_id)
     radius = getattr(config, "exclude_radius_km", 60.0)
+    from wanderlens.pipeline.brief import filter_by_travel, load_brief
+
+    brief = load_brief(conn, user_id)
     candidates = filter_unvisited_proximity(candidates, centers, radius)
+    candidates = filter_by_travel(candidates, brief)
     if enricher is not None:
         candidates = [enrich_destination(conn, user_id, d, enricher) for d in candidates]
     vectors = ensure_destination_embeddings(conn, candidates, embedder)
@@ -383,7 +387,7 @@ def run_recommend(
         feedback=feedback,
         climate=shortlist_climate or None,
         climate_weight=getattr(config, "climate_weight", 0.0),
-        season=getattr(config, "season", "") or None,
+        season=(getattr(config, "season", "") or brief.get("season", "")) or None,
         best_months=shortlist_best_months or None,
         image_vectors=image_vectors,
         calibrate=getattr(config, "calibrate", False),

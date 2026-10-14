@@ -17,6 +17,7 @@ import numpy as np
 
 from wanderlens.catalog.case import load_case
 from wanderlens.catalog.profiles import load_profile as load_destination_profile
+from wanderlens.pipeline.brief import load_brief
 from wanderlens.pipeline.climate import load_destination_climate
 
 
@@ -197,6 +198,7 @@ class ProfileView:
     subjects: list[tuple[str, float]] = field(default_factory=list)
     embedded_photos: int = 0
     trips: list[TripView] = field(default_factory=list)
+    brief: dict = field(default_factory=dict)
 
     @property
     def has_profile(self) -> bool:
@@ -327,6 +329,7 @@ def profile_view(conn: sqlite3.Connection, name: str) -> ProfileView:
         subjects=[(r["key"], r["value"]) for r in entries if r["factor"] == "subjects"],
         embedded_photos=int(embedded),
         trips=trips_view(conn, user_id),
+        brief=load_brief(conn, user_id),
     )
 
 

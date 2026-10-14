@@ -181,6 +181,19 @@ CREATE TABLE IF NOT EXISTS impressions (
     PRIMARY KEY (user_id, run_id, rank)
 );
 
+CREATE TABLE IF NOT EXISTS traveller_brief (
+    user_id         INTEGER PRIMARY KEY,
+    adults          INTEGER,
+    children        INTEGER,
+    pace            TEXT,
+    season          TEXT,
+    max_travel_km   REAL,
+    home_lat        REAL,
+    home_lon        REAL,
+    budget          TEXT,
+    updated_at      TEXT
+);
+
 CREATE TABLE IF NOT EXISTS trip_weather (
     user_id     INTEGER NOT NULL,
     trip_id     INTEGER NOT NULL,

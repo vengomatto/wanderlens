@@ -97,6 +97,17 @@ def test_feedback_reason_and_taste_bias_flags_parse():
     assert parser.parse_args(["recommend", "--taste-bias-weight", "0.2"]).taste_bias_weight == 0.2
 
 
+def test_brief_flags_parse():
+    parser = build_parser()
+    args = parser.parse_args(
+        ["brief", "--adults", "2", "--children", "1", "--home", "44.1,9.6", "--max-travel-km", "800"]
+    )
+    assert args.adults == 2
+    assert args.children == 1
+    assert args.home == "44.1,9.6"
+    assert args.max_travel_km == 800.0
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

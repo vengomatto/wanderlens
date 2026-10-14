@@ -642,3 +642,19 @@ def test_run_recommend_survives_enricher_error(tmp_path):
 
     assert recs
 
+
+def test_run_recommend_applies_travel_range(tmp_path):
+    from wanderlens.pipeline.brief import save_brief
+
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+    conn = connect(config.db_path)
+    save_brief(conn, 1, home_lat=44.0, home_lon=15.0, max_travel_km=100)
+    conn.close()
+
+    recs = run_recommend(config, count=5, embedder=FakeEmbedder(), catalog=catalog)
+
+    ids = [r.destination.id for r in recs]
+    assert "Coastland" in ids
+    assert "Peakville" not in ids
+
