@@ -70,6 +70,12 @@ def test_ingest_estimate_flag_parses():
     assert args.estimate is True
 
 
+def test_ingest_vlm_flag_parses():
+    parser = build_parser()
+    args = parser.parse_args(["ingest", "--tag", "--vlm"])
+    assert args.vlm is True
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

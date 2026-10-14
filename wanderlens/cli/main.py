@@ -32,6 +32,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --tag, print the image count and estimated cost without sending",
     )
+    p_ingest.add_argument(
+        "--vlm",
+        action="store_true",
+        help="with --tag, use the hosted vision model instead of local zero-shot CLIP",
+    )
     p_ingest.set_defaults(func=cmd_ingest)
 
     p_profile = sub.add_parser("profile", help="manage the taste profile")
@@ -157,10 +162,18 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         return 0
 
     vision = None
+    embedder = None
     if args.tag:
-        from wanderlens.models.vision import HostedVLM
+        if (args.vlm or config.tag_provider == "vlm") and config.api_key:
+            from wanderlens.models.vision import HostedVLM
 
-        vision = HostedVLM(config.api_key, config.vlm_model)
+            vision = HostedVLM(config.api_key, config.vlm_model)
+        else:
+            from wanderlens.models.embeddings import OnnxClipEmbedder
+            from wanderlens.models.tagging import ZeroShotTagger
+
+            embedder = OnnxClipEmbedder(cache_dir=config.data_dir / "models")
+            vision = ZeroShotTagger(embedder)
 
     enricher = None
     if config.enrich_taste and config.api_key:
@@ -169,7 +182,12 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         enricher = HostedTasteEnricher(config.api_key, config.llm_model)
 
     trips = run_profile(
-        config, user_name=args.user, vision=vision, retag=args.retag, enricher=enricher
+        config,
+        user_name=args.user,
+        vision=vision,
+        retag=args.retag,
+        enricher=enricher,
+        embedder=embedder,
     )
     print(
         f"Ingested {count} new photo(s); built profile with {len(trips)} trip(s) "

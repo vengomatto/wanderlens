@@ -46,6 +46,7 @@ class Config:
     climate: bool = False
     climate_weight: float = 0.0
     season: str = ""
+    tag_provider: str = "clip"
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -192,6 +193,9 @@ def load_config(
             values.get("climate_weight") or env.get("WANDERLENS_CLIMATE_WEIGHT") or 0.0
         ),
         season=str(values.get("season") or env.get("WANDERLENS_SEASON") or "").lower(),
+        tag_provider=str(
+            values.get("tag_provider") or env.get("WANDERLENS_TAG_PROVIDER") or "clip"
+        ).lower(),
     )
 
 
