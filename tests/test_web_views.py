@@ -350,6 +350,21 @@ def test_destination_detail_has_photo_links(tmp_path):
     assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
 
 
+def test_recommendations_use_latest_run_and_mark_new(tmp_path):
+    conn = _seed(tmp_path)
+    conn.execute(
+        "INSERT INTO recommendations "
+        "(user_id, run_id, rank, destination_id, score, destination_name, destination_country) "
+        "VALUES (1, 2, 1, 'wy:newdest', 0.9, 'Newdest', 'Spain')"
+    )
+    conn.commit()
+
+    recs = views.recommendations_view(conn, 1)
+
+    assert [rec.destination_id for rec in recs] == ["wy:newdest"]
+    assert recs[0].is_new is True
+
+
 def test_destination_shows_profile(tmp_path):
     import json
 

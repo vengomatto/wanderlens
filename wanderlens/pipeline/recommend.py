@@ -138,6 +138,43 @@ def load_feedback(conn: sqlite3.Connection, user_id: int) -> dict[str, str]:
     return {row["destination_id"]: row["action"] for row in rows}
 
 
+def load_feedback_bias(conn: sqlite3.Connection, user_id: int):
+    """A deterministic adjustment vector: mean(liked) - mean(disliked) embeddings."""
+    rows = conn.execute(
+        "SELECT destination_id, action FROM feedback WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    liked: list = []
+    disliked: list = []
+    for row in rows:
+        vector_row = conn.execute(
+            "SELECT vector FROM destination_embeddings WHERE destination_id = ? LIMIT 1",
+            (row["destination_id"],),
+        ).fetchone()
+        if vector_row is None:
+            continue
+        vector = np.frombuffer(vector_row["vector"], dtype=np.float32)
+        if row["action"] in {"like", "save"}:
+            liked.append(vector)
+        elif row["action"] in {"dislike", "skip"}:
+            disliked.append(vector)
+    if not liked and not disliked:
+        return None
+
+    def mean(vectors):
+        mean_vector = np.mean(np.stack(vectors), axis=0).astype(np.float32)
+        norm = float(np.linalg.norm(mean_vector))
+        return mean_vector / norm if norm else mean_vector
+
+    if liked and disliked:
+        bias = mean(liked) - mean(disliked)
+    elif liked:
+        bias = mean(liked)
+    else:
+        bias = -mean(disliked)
+    norm = float(np.linalg.norm(bias))
+    return bias / norm if norm else bias
+
+
 def _geonames_catalog(
     config, country_codes, limit: int, min_population: int = 50000, providers=None
 ) -> JsonCatalog:
@@ -275,6 +312,9 @@ def run_recommend(
     profile = load_profile(conn, user_id, embedding=taste)
     tags = taste_attribute_weights(profile.tags)
     feedback = load_feedback(conn, user_id)
+    taste_bias = None
+    if getattr(config, "taste_bias_weight", 0.0):
+        taste_bias = load_feedback_bias(conn, user_id)
 
     climate_profile = {}
     climate_enabled = bool(
@@ -347,6 +387,8 @@ def run_recommend(
         best_months=shortlist_best_months or None,
         image_vectors=image_vectors,
         calibrate=getattr(config, "calibrate", False),
+        taste_bias=taste_bias,
+        taste_bias_weight=getattr(config, "taste_bias_weight", 0.0),
     )
 
     if diagnose:
@@ -387,7 +429,10 @@ def run_recommend(
                 conn, user_id, rec, profile, visited_country, explainer
             )
 
-    conn.execute("DELETE FROM recommendations WHERE user_id = ?", (user_id,))
+    run_id = conn.execute(
+        "SELECT COALESCE(MAX(run_id), 0) + 1 FROM recommendations WHERE user_id = ?", (user_id,)
+    ).fetchone()[0]
+    now = datetime.now(timezone.utc).isoformat()
     for rec in recommendations:
         destination = rec.destination
         conn.execute(
@@ -397,9 +442,10 @@ def run_recommend(
             " destination_description, embedding_score, attribute_score, "
             " matched_attributes, best_trip_id, best_trip_label, best_facet_similarity, "
             " nearest_trip_km, popularity, popularity_label) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
+                run_id,
                 rec.rank,
                 destination.id,
                 rec.score,
@@ -420,6 +466,14 @@ def run_recommend(
                 rec.popularity_label,
             ),
         )
+        conn.execute(
+            "INSERT OR REPLACE INTO impressions "
+            "(user_id, run_id, destination_id, rank, shown_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, run_id, destination.id, rec.rank, now),
+        )
+    conn.execute(
+        "DELETE FROM recommendations WHERE user_id = ? AND run_id <= ?", (user_id, run_id - 10)
+    )
     conn.commit()
 
     if media:

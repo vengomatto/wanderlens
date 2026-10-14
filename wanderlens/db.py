@@ -167,8 +167,18 @@ CREATE TABLE IF NOT EXISTS feedback (
     user_id         INTEGER NOT NULL,
     destination_id  TEXT    NOT NULL,
     action          TEXT    NOT NULL,
+    reason          TEXT,
     created_at      TEXT,
     PRIMARY KEY (user_id, destination_id)
+);
+
+CREATE TABLE IF NOT EXISTS impressions (
+    user_id         INTEGER NOT NULL,
+    run_id          INTEGER NOT NULL,
+    destination_id  TEXT    NOT NULL,
+    rank            INTEGER NOT NULL,
+    shown_at        TEXT,
+    PRIMARY KEY (user_id, run_id, rank)
 );
 
 CREATE TABLE IF NOT EXISTS trip_weather (
@@ -293,3 +303,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     guide_columns = {row[1] for row in conn.execute("PRAGMA table_info(destination_guide)")}
     if "diaries" not in guide_columns:
         conn.execute("ALTER TABLE destination_guide ADD COLUMN diaries TEXT")
+
+    feedback_columns = {row[1] for row in conn.execute("PRAGMA table_info(feedback)")}
+    if "reason" not in feedback_columns:
+        conn.execute("ALTER TABLE feedback ADD COLUMN reason TEXT")

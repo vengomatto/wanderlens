@@ -91,6 +91,12 @@ def test_recommend_profiles_flag_parses():
     assert parser.parse_args(["recommend", "--profiles"]).profiles is True
 
 
+def test_feedback_reason_and_taste_bias_flags_parse():
+    parser = build_parser()
+    assert parser.parse_args(["feedback", "--destination", "x", "--action", "dislike", "--reason", "too far"]).reason == "too far"
+    assert parser.parse_args(["recommend", "--taste-bias-weight", "0.2"]).taste_bias_weight == 0.2
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

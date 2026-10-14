@@ -33,6 +33,7 @@
           <h2><a href="/destinations/{{ rec.destination_id | urlencode }}">{{ rec.name }}</a></h2>
           {% if rec.country %}<span class="country">{{ rec.country }}</span>{% endif %}
           {% if rec.popularity_label %}<span class="fame fame-{{ rec.popularity_label }}">{{ rec.popularity_label }}</span>{% endif %}
+          {% if rec.is_new %}<span class="rec-new">new</span>{% endif %}
         </div>
         {% if rec.description %}<p class="desc">{{ rec.description }}</p>{% endif %}
         {% if rec.case_snippet %}<p class="case-snippet">{{ rec.case_snippet }} <a href="/destinations/{{ rec.destination_id | urlencode }}">Read more →</a></p>{% endif %}

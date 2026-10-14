@@ -244,6 +244,8 @@ def rank_destinations(
     best_months: Optional[dict[str, list]] = None,
     image_vectors: Optional[dict] = None,
     calibrate: bool = False,
+    taste_bias: Optional[object] = None,
+    taste_bias_weight: float = 0.0,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -320,6 +322,9 @@ def rank_destinations(
         if season and best_months:
             if season_overlap(best_months.get(destination.id, []), season):
                 delta += max(climate_weight, 0.05)
+
+        if taste_bias is not None and taste_bias_weight:
+            delta += taste_bias_weight * float(np.dot(vector, taste_bias))
 
         if taste_tags:
             base = alpha * embedding_score + (1.0 - alpha) * attribute_score

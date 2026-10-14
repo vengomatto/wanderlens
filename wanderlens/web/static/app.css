@@ -615,6 +615,21 @@ main {
 .fb.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .fb-like.active, .fb-save.active { background: var(--accent-2); border-color: var(--accent-2); }
 .fb-dislike.active, .fb-skip.active { background: #b23b3b; border-color: #b23b3b; }
+.fb-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fb-reasons { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.fb-reason { font-size: 0.7rem; padding: 0.2rem 0.55rem; text-transform: none; }
+.rec-new {
+  display: inline-block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent-2);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
 
 /* Estimated badge + profile facts */
 .estimated {

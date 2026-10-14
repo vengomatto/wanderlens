@@ -1,8 +1,17 @@
 <div class="feedback">
-  {% for action in ['like', 'save', 'dislike', 'skip'] %}
-  <button type="button"
-    class="fb fb-{{ action }}{% if feedback_action == action %} active{% endif %}"
-    hx-post="/destinations/{{ destination_id | urlencode }}/feedback?action={{ action }}"
-    hx-target="closest .feedback" hx-swap="outerHTML">{{ action }}</button>
-  {% endfor %}
+  <div class="fb-row">
+    {% for action in ['like', 'save', 'dislike', 'skip'] %}
+    <button type="button"
+      class="fb fb-{{ action }}{% if feedback_action == action %} active{% endif %}"
+      hx-post="/destinations/{{ destination_id | urlencode }}/feedback?action={{ action }}"
+      hx-target="closest .feedback" hx-swap="outerHTML">{{ action }}</button>
+    {% endfor %}
+  </div>
+  <div class="fb-reasons">
+    {% for reason in ['too touristy', 'too far', 'not my vibe', 'been there'] %}
+    <button type="button" class="fb fb-reason"
+      hx-post="/destinations/{{ destination_id | urlencode }}/feedback?action=dislike&reason={{ reason | urlencode }}"
+      hx-target="closest .feedback" hx-swap="outerHTML">{{ reason }}</button>
+    {% endfor %}
+  </div>
 </div>

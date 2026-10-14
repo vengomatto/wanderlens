@@ -15,8 +15,10 @@ def load_recommended_destinations(
     rows = conn.execute(
         "SELECT destination_id, destination_name, destination_country, destination_lat, "
         "destination_lon, destination_description FROM recommendations "
-        "WHERE user_id = ? ORDER BY rank",
-        (user_id,),
+        "WHERE user_id = ? AND run_id = "
+        "(SELECT COALESCE(MAX(run_id), 0) FROM recommendations WHERE user_id = ?) "
+        "ORDER BY rank",
+        (user_id, user_id),
     ).fetchall()
     destinations = [
         Destination(

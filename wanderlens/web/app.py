@@ -131,14 +131,14 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
         )
 
     @app.post("/destinations/{destination_id}/feedback")
-    def destination_feedback(request: Request, destination_id: str, action: str = ""):
+    def destination_feedback(request: Request, destination_id: str, action: str = "", reason: str = ""):
         conn = connect(app.state.config.db_path)
         try:
             _open(conn)
             user_id = views.resolve_user(conn, app.state.user_name)
             current = ""
             if user_id is not None:
-                views.record_feedback(conn, user_id, destination_id, action)
+                views.record_feedback(conn, user_id, destination_id, action, reason)
                 current = views.feedback_action(conn, user_id, destination_id)
         finally:
             conn.close()

@@ -112,6 +112,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="build structured destination profiles (keyless baseline + optional model)",
     )
+    p_rec.add_argument(
+        "--taste-bias-weight",
+        type=float,
+        default=None,
+        help="bias ranking by a learned feedback vector (0 = off)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -145,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_fb.add_argument("--list", action="store_true", help="list recorded feedback")
     p_fb.add_argument("--clear", action="store_true", help="clear all feedback")
+    p_fb.add_argument("--reason", default=None, help="optional reason for the action")
     p_fb.set_defaults(func=cmd_feedback)
 
     p_serve = sub.add_parser("serve", help="run the local read-only web dashboard")
@@ -226,6 +233,8 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     config.refresh_media = config.refresh_media or args.refresh_media
     config.calibrate = config.calibrate or args.calibrate
+    if args.taste_bias_weight is not None:
+        config.taste_bias_weight = args.taste_bias_weight
     if args.season:
         config.season = args.season
         config.climate = True
@@ -346,9 +355,15 @@ def cmd_feedback(args: argparse.Namespace) -> int:
         return 0
     if args.destination and args.action:
         conn.execute(
-            "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user_id, args.destination, args.action, datetime.now(timezone.utc).isoformat()),
+            "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, reason, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                user_id,
+                args.destination,
+                args.action,
+                args.reason,
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
         conn.commit()
         print(f"Recorded {args.action} for {args.destination}.")

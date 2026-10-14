@@ -52,6 +52,7 @@ class Config:
     catalog_countries: list[str] = field(default_factory=list)
     catalog_min_extract: int = 0
     build_profiles: bool = False
+    taste_bias_weight: float = 0.0
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -221,6 +222,9 @@ def load_config(
             bool(values.get("build_profiles"))
             if "build_profiles" in values
             else str(env.get("WANDERLENS_BUILD_PROFILES", "")).lower() in {"1", "true", "yes", "on"}
+        ),
+        taste_bias_weight=float(
+            values.get("taste_bias_weight") or env.get("WANDERLENS_TASTE_BIAS_WEIGHT") or 0.0
         ),
     )
 

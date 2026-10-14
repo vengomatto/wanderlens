@@ -30,15 +30,23 @@ def _structure(text: str) -> tuple[str, list[str]]:
     return sentences[0], sentences[1:5]
 
 
-def record_feedback(conn: sqlite3.Connection, user_id: int, destination_id: str, action: str) -> None:
+def record_feedback(
+    conn: sqlite3.Connection, user_id: int, destination_id: str, action: str, reason: str = ""
+) -> None:
     from datetime import datetime, timezone
 
     if action not in {"save", "like", "dislike", "skip"}:
         return
     conn.execute(
-        "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, created_at) "
-        "VALUES (?, ?, ?, ?)",
-        (user_id, destination_id, action, datetime.now(timezone.utc).isoformat()),
+        "INSERT OR REPLACE INTO feedback (user_id, destination_id, action, reason, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            user_id,
+            destination_id,
+            action,
+            reason or None,
+            datetime.now(timezone.utc).isoformat(),
+        ),
     )
     conn.commit()
 
@@ -101,6 +109,7 @@ class RecView:
     popularity_label: str = ""
     case_snippet: str = ""
     photo_links: list[dict] = field(default_factory=list)
+    is_new: bool = False
 
 
 @dataclass
@@ -240,8 +249,8 @@ def similar_destinations(
     scored: list[tuple[float, dict]] = []
     rows = conn.execute(
         "SELECT destination_id, destination_name, destination_country FROM recommendations "
-        "WHERE user_id = ? AND destination_id <> ? ORDER BY rank",
-        (user_id, destination_id),
+        "WHERE user_id = ? AND run_id = ? AND destination_id <> ? ORDER BY rank",
+        (user_id, latest_run_id(conn, user_id), destination_id),
     ).fetchall()
     for row in rows:
         vector = _embedding(conn, row["destination_id"])
@@ -335,15 +344,29 @@ def trip_detail(conn: sqlite3.Connection, user_id: int, trip_id: int) -> Optiona
     return {"trip": trip, "photos": photos, "attributes": trip.attributes}
 
 
+def latest_run_id(conn: sqlite3.Connection, user_id: int) -> int:
+    row = conn.execute(
+        "SELECT COALESCE(MAX(run_id), 0) FROM recommendations WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
 def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView]:
+    run_id = latest_run_id(conn, user_id)
     rows = conn.execute(
         "SELECT rank, destination_id, destination_name, destination_country, "
         "destination_lat, destination_lon, destination_description, score, "
         "explanation, embedding_score, attribute_score, matched_attributes, "
         "best_trip_label, nearest_trip_km, popularity_label "
-        "FROM recommendations WHERE user_id = ? ORDER BY rank",
-        (user_id,),
+        "FROM recommendations WHERE user_id = ? AND run_id = ? ORDER BY rank",
+        (user_id, run_id),
     ).fetchall()
+    previous = conn.execute(
+        "SELECT destination_id FROM recommendations WHERE user_id = ? AND run_id = "
+        "(SELECT COALESCE(MAX(run_id), 0) FROM recommendations WHERE user_id = ? AND run_id < ?)",
+        (user_id, user_id, run_id),
+    ).fetchall()
+    previous_ids = {row["destination_id"] for row in previous}
     with_images = _destinations_with_images(conn, [row["destination_id"] for row in rows])
     return [
         RecView(
@@ -369,6 +392,7 @@ def recommendations_view(conn: sqlite3.Connection, user_id: int) -> list[RecView
                 row["destination_name"] or row["destination_id"],
                 row["destination_country"] or "",
             ),
+            is_new=bool(previous_ids) and row["destination_id"] not in previous_ids,
         )
         for row in rows
     ]

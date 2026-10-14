@@ -155,10 +155,13 @@ exercised without a key; point
 `recommend` to test ranking on a broad dataset instead of a few photos.
 
 **Feedback** biases ranking: `wanderlens feedback --destination <id> --action
-{like|save|dislike|skip}` (or the buttons on a destination page) records a
-reaction, and likes/saves are favoured while dislikes/skips are pushed down;
-`--list` shows and `--clear` removes it. Catalog names are normalized and
-deduplicated on load. `recommend --refresh-media` re-fetches media so the new
+{like|save|dislike|skip} [--reason <why>]` (or the buttons on a destination page,
+with reason chips) records a reaction — likes/saves are favoured, dislikes/skips
+pushed down — and `recommend --taste-bias-weight 0.15` (off by default) biases
+ranking by a **learned vector** (mean of liked minus disliked destination
+vectors). Each run is **versioned** (`run_id`) and keeps history; the dashboard
+shows the latest run and marks what is **new since last run**. `--list` shows and
+`--clear` removes feedback. `recommend --refresh-media` re-fetches media so the new
 quality tiering applies to already-cached destinations, and near-duplicate images
 are dropped by perceptual hash.
 

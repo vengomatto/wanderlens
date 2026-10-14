@@ -39,3 +39,19 @@ def test_no_feedback_leaves_ranking_unchanged():
         for r in rank_destinations(taste, [_d("a"), _d("b")], vectors=_vectors(), feedback={})
     ]
     assert without == empty
+
+
+def test_taste_bias_reorders_when_enabled():
+    taste = np.array([1.0, 1.0], dtype=np.float32)
+    vectors = {
+        "a": np.array([1.0, 0.0], dtype=np.float32),
+        "b": np.array([0.0, 1.0], dtype=np.float32),
+    }
+    bias = np.array([0.0, 1.0], dtype=np.float32)
+
+    ranked = rank_destinations(
+        taste, [_d("a"), _d("b")], vectors=vectors, top_k=2,
+        taste_bias=bias, taste_bias_weight=0.5,
+    )
+
+    assert ranked[0].destination.id == "b"

@@ -77,6 +77,44 @@ def test_cases_built_for_final_recommendations_only(tmp_path, monkeypatch):
     assert writer.calls == len(recs)
 
 
+def test_run_history_and_impressions(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    run_recommend(config, count=2, embedder=FakeEmbedder(), catalog=catalog)
+    run_recommend(config, count=2, embedder=FakeEmbedder(), catalog=catalog)
+
+    conn = connect(config.db_path)
+    runs = [row[0] for row in conn.execute("SELECT DISTINCT run_id FROM recommendations ORDER BY run_id")]
+    assert runs == [1, 2]
+    impressions = conn.execute("SELECT COUNT(*) FROM impressions WHERE run_id = 2").fetchone()[0]
+    assert impressions == 2
+
+
+def test_feedback_bias_is_deterministic(tmp_path):
+    import numpy as np
+
+    from wanderlens.pipeline.recommend import load_feedback_bias
+
+    config = _seed(tmp_path)
+    conn = connect(config.db_path)
+    for dest_id, vector in (("a", [1.0, 0.0]), ("b", [0.0, 1.0])):
+        conn.execute(
+            "INSERT INTO destination_embeddings (destination_id, model, dim, vector) VALUES (?, 'm', 2, ?)",
+            (dest_id, np.array(vector, dtype=np.float32).tobytes()),
+        )
+    conn.execute("INSERT INTO feedback (user_id, destination_id, action) VALUES (1, 'a', 'like')")
+    conn.execute("INSERT INTO feedback (user_id, destination_id, action) VALUES (1, 'b', 'dislike')")
+    conn.commit()
+
+    first = load_feedback_bias(conn, 1)
+    second = load_feedback_bias(conn, 1)
+
+    assert first is not None
+    assert abs(float(np.linalg.norm(first)) - 1.0) < 1e-5
+    assert np.allclose(first, second)
+
+
 class FakeRanker:
     def rank(self, recommendations, profile):
         for rank, rec in enumerate(recommendations, start=1):
