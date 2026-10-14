@@ -299,6 +299,30 @@ def test_derived_itinerary_without_model():
     assert any("Benagil Cave" in day["items"] for day in derived[0]["days"])
 
 
+def test_itinerary_groups_by_proximity():
+    from wanderlens.catalog.guide import _poi_itinerary
+
+    pois = [
+        {"name": "A1", "lat": 10.0, "lon": 10.0},
+        {"name": "A2", "lat": 10.01, "lon": 10.01},
+        {"name": "B1", "lat": 20.0, "lon": 20.0},
+        {"name": "B2", "lat": 20.01, "lon": 20.01},
+    ]
+
+    groups = [set(day["items"]) for day in _poi_itinerary(pois, 2)]
+
+    assert {"A1", "A2"} in groups
+    assert {"B1", "B2"} in groups
+
+
+def test_itinerary_falls_back_without_coordinates():
+    from wanderlens.catalog.guide import _poi_itinerary
+
+    plan = _poi_itinerary([{"name": n} for n in "ABCD"], 2)
+
+    assert [len(day["items"]) for day in plan] == [2, 2]
+
+
 def test_diaries_gathered_and_deduped():
     guide = gather_guide(
         _destination(),

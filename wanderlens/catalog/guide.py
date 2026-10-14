@@ -175,24 +175,61 @@ def _diaries(destination: Destination, voyage, blogs) -> list[dict]:
     return _dedupe(items)[:MAX_DIARIES]
 
 
+def _cluster_pois(pois: list[dict], days: int) -> list[list[dict]]:
+    """Group points of interest into days by geographic proximity."""
+    from wanderlens.core.taste import haversine_km
+
+    located = [p for p in pois if p.get("lat") is not None and p.get("lon") is not None]
+    unlocated = [p for p in pois if p not in located]
+    if not located:
+        return []
+    per_day = max(1, (len(located) + days - 1) // days)
+    remaining = list(located)
+    plan: list[list[dict]] = []
+    while remaining:
+        current = [remaining.pop(0)]
+        while remaining and len(current) < per_day:
+            last = current[-1]
+            nearest = min(
+                remaining,
+                key=lambda p: haversine_km(last["lat"], last["lon"], p["lat"], p["lon"]),
+            )
+            remaining.remove(nearest)
+            current.append(nearest)
+        plan.append(current)
+    if unlocated and plan:
+        plan[-1].extend(unlocated)
+    elif unlocated:
+        plan.append(unlocated)
+    return plan
+
+
 def _poi_itinerary(pois: list[dict], days: int) -> list[dict]:
-    """Balance the Destination's points of interest across ``days`` days."""
+    """Balance the Destination's points of interest across ``days`` days.
+
+    Points are grouped by geographic proximity so a day stays in one area; when
+    no coordinates are available, they are split evenly in order.
+    """
     named = [poi for poi in pois if poi.get("name")]
     if not named:
         return []
     days = max(1, days)
-    per_day = max(1, (len(named) + days - 1) // days)
-    plan: list[dict] = []
-    for index in range(0, len(named), per_day):
-        chunk = named[index : index + per_day]
-        plan.append(
-            {
-                "title": f"Day {index // per_day + 1}",
-                "summary": "",
-                "items": [poi["name"] for poi in chunk],
-            }
-        )
-    return plan
+
+    clustered = _cluster_pois(named, days)
+    if clustered:
+        groups = clustered
+    else:
+        per_day = max(1, (len(named) + days - 1) // days)
+        groups = [named[index : index + per_day] for index in range(0, len(named), per_day)]
+
+    return [
+        {
+            "title": f"Day {index}",
+            "summary": "",
+            "items": [poi["name"] for poi in group],
+        }
+        for index, group in enumerate(groups, start=1)
+    ]
 
 
 def _itineraries(destination, voyage, pois, synthesizer, days, search_results=None) -> list[dict]:
