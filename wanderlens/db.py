@@ -194,6 +194,16 @@ CREATE TABLE IF NOT EXISTS traveller_brief (
     updated_at      TEXT
 );
 
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT    NOT NULL,
+    status      TEXT    NOT NULL,
+    progress    INTEGER DEFAULT 0,
+    message     TEXT,
+    created_at  TEXT,
+    updated_at  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS trip_weather (
     user_id     INTEGER NOT NULL,
     trip_id     INTEGER NOT NULL,

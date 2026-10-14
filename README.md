@@ -200,7 +200,7 @@ with `recommend --season summer`; both are off by default.
 
 ### Web dashboard
 
-A local, read-only dashboard over the same data (FastAPI + Jinja + HTMX + a
+A local dashboard over the same data (FastAPI + Jinja + HTMX + a
 little Alpine.js, no build step):
 
 ```bash
@@ -210,15 +210,20 @@ little Alpine.js, no build step):
 
 It shows the Taste Profile, the ranked Recommendations (with their score
 components), each trip's own photos, and a map of visited and recommended
-places. It renders from the database only and never triggers ingestion or
-ranking — run `ingest` / `recommend` (or `ingest --tag`) first. Bound to
-localhost and single-user; front-end assets are vendored so it works offline.
+places. It renders from the database and never recomputes on view — start
+`ingest` / `recommend` from the CLI, or the Pipeline card. Bound to localhost and
+single-user; front-end assets are vendored so it works offline.
 
 Recommendations can be viewed as an **image-tile grid** (with a list toggle), and
 a **Saved** board lists the places you liked or saved (with the reason you gave),
 straight from the database. **Discover** presents a card stack of unrated
 candidates — react with like/save/skip/dislike (arrow keys or buttons) — which
 feeds the same feedback loop.
+
+The dashboard never recomputes when you view a page, but you can **run the
+pipeline from it**: a **Pipeline** card on the taste page starts `ingest` or
+`recommend` as a background job (single-flight, per-process token) and polls its
+status. Bound to localhost and single-user.
 
 Recommendations now carry **pictures and a real destination page**. When you run
 `recommend`, each recommended Destination also fetches a Wikipedia image, an

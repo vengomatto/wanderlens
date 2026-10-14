@@ -138,6 +138,42 @@ def _client(config):
     return TestClient(create_app(config))
 
 
+class FakeRunner:
+    def __init__(self):
+        self.kinds = []
+
+    def running(self):
+        return False
+
+    def submit(self, kind, fn):
+        self.kinds.append(kind)
+        return len(self.kinds)
+
+
+def test_jobs_post_requires_token_and_creates(tmp_path):
+    config = _seed(_config(tmp_path))
+    app = create_app(config)
+    runner = FakeRunner()
+    app.state.job_runner = runner
+    client = TestClient(app)
+    token = app.state.post_token
+
+    assert client.post("/jobs/ingest", follow_redirects=False).status_code == 403
+    response = client.post(f"/jobs/ingest?token={token}", follow_redirects=False)
+    assert response.status_code == 303
+    assert runner.kinds == ["ingest"]
+
+
+def test_jobs_latest_and_profile_pipeline(tmp_path):
+    config = _seed(_config(tmp_path))
+    client = _client(config)
+
+    assert client.get("/jobs/latest").status_code == 200
+    body = client.get("/").text
+    assert "Pipeline" in body
+    assert "Run ingest" in body
+
+
 def test_profile_page_renders(tmp_path):
     config = _seed(_config(tmp_path))
     response = _client(config).get("/")

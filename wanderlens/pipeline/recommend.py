@@ -606,3 +606,12 @@ def _default_popularity_fetcher(conn, destinations) -> dict:
     from wanderlens.catalog.popularity import fetch_popularity_for
 
     return fetch_popularity_for(conn, destinations)
+
+
+def run_ingest_job(config, user_name: str = "owner"):
+    """Ingest photos and rebuild the profile (used by the dashboard job runner)."""
+    from wanderlens.pipeline.ingest import run_ingest
+    from wanderlens.pipeline.profile import run_profile
+
+    run_ingest(config, user_name=user_name)
+    return run_profile(config, user_name=user_name)

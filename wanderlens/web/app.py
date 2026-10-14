@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 import sqlite3
 from pathlib import Path
 
@@ -42,12 +43,18 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
     app = FastAPI(title="Wanderlens", docs_url=None, redoc_url=None)
     app.state.config = config
     app.state.user_name = user_name
+    init_db(connect(str(config.db_path)))
+    app.state.post_token = secrets.token_urlsafe(24)
+    from wanderlens.web.jobs import JobRunner
+
+    app.state.job_runner = JobRunner(config.db_path)
 
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     def render(request: Request, template: str, **context) -> HTMLResponse:
+        context.setdefault("post_token", app.state.post_token)
         context.setdefault(
             "tiles",
             {
@@ -99,6 +106,50 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
         finally:
             conn.close()
         return render(request, "discover.html", active="discover", items=items)
+
+    @app.post("/jobs/{kind}")
+    def start_job(request: Request, kind: str, token: str = ""):
+        if kind not in {"ingest", "recommend"}:
+            raise HTTPException(status_code=404, detail="Unknown job")
+        if not app.state.post_token or token != app.state.post_token:
+            raise HTTPException(status_code=403, detail="Bad token")
+        if app.state.job_runner.running():
+            raise HTTPException(status_code=409, detail="A job is already running")
+        config = app.state.config
+        if kind == "ingest":
+            from wanderlens.pipeline.recommend import run_ingest_job
+
+            fn = lambda: run_ingest_job(config, app.state.user_name)
+        else:
+            from wanderlens.pipeline.recommend import run_recommend
+
+            fn = lambda: run_recommend(
+                config, user_name=app.state.user_name, count=8, media=True, popularity=True
+            )
+        app.state.job_runner.submit(kind, fn)
+        return RedirectResponse(url="/", status_code=303)
+
+    @app.get("/jobs/latest", response_class=HTMLResponse)
+    def job_latest(request: Request) -> HTMLResponse:
+        from wanderlens.web.jobs import latest_job
+
+        conn = connect(app.state.config.db_path)
+        try:
+            job = latest_job(conn)
+        finally:
+            conn.close()
+        return render(request, "_job.html", job=job)
+
+    @app.get("/jobs/{job_id}", response_class=HTMLResponse)
+    def job_status(request: Request, job_id: int) -> HTMLResponse:
+        from wanderlens.web.jobs import load_job
+
+        conn = connect(app.state.config.db_path)
+        try:
+            job = load_job(conn, job_id)
+        finally:
+            conn.close()
+        return render(request, "_job.html", job=job)
 
     @app.get("/trips/{trip_id}", response_class=HTMLResponse)
     def trip(request: Request, trip_id: int) -> HTMLResponse:

@@ -670,6 +670,17 @@ main {
 .disc-body h2 { margin: 0 0 0.4rem; }
 .disc-count { text-align: center; margin-top: 0.6rem; }
 
+/* Pipeline jobs */
+.jobs-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.job-live { margin-top: 0.5rem; }
+.job { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.job-kind { font-weight: 600; }
+.job-status { text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+.job-done .job-status { color: var(--accent-2); }
+.job-error .job-status { color: #b23b3b; }
+.job-msg { color: var(--muted); font-size: 0.85rem; }
+.job progress { flex: 1 1 120px; }
+
 /* Estimated badge + profile facts */
 .estimated {
   font-size: 0.66rem;

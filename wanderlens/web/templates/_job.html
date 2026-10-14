@@ -1,0 +1,10 @@
+{% if job %}
+<div class="job job-{{ job.status }}">
+  <span class="job-kind">{{ job.kind }}</span>
+  <span class="job-status">{{ job.status }}</span>
+  {% if job.message %}<span class="job-msg">{{ job.message }}</span>{% endif %}
+  <progress max="100" value="{{ job.progress or 0 }}"></progress>
+</div>
+{% else %}
+<div class="muted">No jobs yet.</div>
+{% endif %}

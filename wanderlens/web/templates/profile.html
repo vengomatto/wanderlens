@@ -69,6 +69,20 @@
 </section>
 
 <section class="card">
+  <h2>Pipeline</h2>
+  <p class="muted">Run the pipeline from here — only when you press a button.</p>
+  <div class="jobs-actions">
+    <form method="post" action="/jobs/ingest?token={{ post_token }}">
+      <button class="fb fb-like" type="submit">Run ingest</button>
+    </form>
+    <form method="post" action="/jobs/recommend?token={{ post_token }}">
+      <button class="fb fb-save" type="submit">Run recommend</button>
+    </form>
+  </div>
+  <div class="job-live" hx-get="/jobs/latest" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+</section>
+
+<section class="card">
   <h2>Trips</h2>
   <div class="trip-grid">
     {% for trip in view.trips %}
