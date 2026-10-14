@@ -165,6 +165,24 @@
   </section>
   {% endif %}
 
+  {% if detail.profile %}
+  <section class="card profile-card">
+    <h2>Destination profile</h2>
+    {% if detail.profile.summary %}
+    <p class="prose">{{ detail.profile.summary }}{% if 'summary' in detail.profile.estimated %} <span class="estimated">estimated</span>{% endif %}</p>
+    {% endif %}
+    {% if detail.profile.vibe %}
+    <p class="chips">{% for name, score in detail.profile.vibe.items() %}<span title="{{ score }}">{{ name }}</span>{% endfor %}</p>
+    {% endif %}
+    <dl class="profile-facts">
+      {% if detail.profile.typical_stay_days %}<dt>Typical stay</dt><dd>{{ detail.profile.typical_stay_days }} days <span class="estimated">estimated</span></dd>{% endif %}
+      {% for key, label in [('family_suitability', 'Family'), ('walkability', 'Walkability'), ('base_camp', 'Base-camp friendly')] %}
+      {% if detail.profile[key] %}<dt>{{ label }}</dt><dd>{{ detail.profile[key] }} <span class="estimated">estimated</span></dd>{% endif %}
+      {% endfor %}
+    </dl>
+  </section>
+  {% endif %}
+
   {% if detail.books %}
   <section class="card">
     <h2>Read before you go</h2>

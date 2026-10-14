@@ -134,6 +134,11 @@ vision, and is cached per destination. It is opt-in pending measurement on
 and attribute components across the candidate pool before blending, so neither
 term dominates by magnitude — also gated on `eval --loto`.
 
+**Destination profiles:** `recommend --profiles` builds a structured profile per
+destination (vibe scores, typical stay, family/walkability/base-camp suitability)
+— a keyless baseline from its attributes always, model-enriched and cached when a
+key is set, with model-estimated fields labelled. Shown on the destination page.
+
 `eval --synthetic` ranks a reproducible synthetic gallery and reports
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
 `eval --loto` runs **leave-one-trip-out** evaluation over every trip and reports

@@ -16,6 +16,7 @@ from urllib.parse import quote_plus
 import numpy as np
 
 from wanderlens.catalog.case import load_case
+from wanderlens.catalog.profiles import load_profile as load_destination_profile
 from wanderlens.pipeline.climate import load_destination_climate
 
 
@@ -163,6 +164,7 @@ class DestinationDetail:
     feedback_action: str = ""
     best_months: list[int] = field(default_factory=list)
     climate_match: float = 0.0
+    profile: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -471,6 +473,7 @@ def destination_detail(
         feedback_action=feedback_action(conn, user_id, destination_id),
         best_months=climate_fit.get("best_months", []),
         climate_match=climate_fit.get("match", 0.0),
+        profile=load_destination_profile(conn, destination_id),
         description_lead=description_lead,
         description_highlights=description_highlights,
         diaries=_json_list(guide["diaries"]) if guide and "diaries" in guide.keys() else [],

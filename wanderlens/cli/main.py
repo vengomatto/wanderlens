@@ -107,6 +107,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="rescale score components per pool before blending (off by default)",
     )
+    p_rec.add_argument(
+        "--profiles",
+        action="store_true",
+        help="build structured destination profiles (keyless baseline + optional model)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -247,6 +252,13 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
             case_writer = HostedCaseWriter(config.api_key, config.llm_model)
 
+    profile_writer = None
+    if args.profiles or config.build_profiles:
+        if config.api_key:
+            from wanderlens.models.profiles import HostedProfileWriter
+
+            profile_writer = HostedProfileWriter(config.api_key, config.llm_model)
+
     recs = run_recommend(
         config,
         user_name=args.user,
@@ -261,6 +273,8 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         case_writer=case_writer,
         diagnose=args.diagnose,
         image_matching=args.image_matching or config.image_matching,
+        profiles=args.profiles or config.build_profiles,
+        profile_writer=profile_writer,
     )
     if not recs:
         print("No recommendations.")

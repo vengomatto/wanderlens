@@ -219,6 +219,8 @@ def run_recommend(
     diagnose: bool = False,
     image_matching: bool = False,
     image_fetcher=None,
+    profiles: bool = False,
+    profile_writer=None,
 ) -> list[Recommendation]:
     from wanderlens.pipeline.ingest import get_or_create_user
 
@@ -362,6 +364,15 @@ def run_recommend(
                     searcher=case_searcher,
                     writer=case_writer,
                 )
+            except Exception:
+                continue
+
+    if profiles or profile_writer is not None:
+        from wanderlens.catalog.profiles import build_profile
+
+        for rec in recommendations:
+            try:
+                build_profile(conn, rec.destination, writer=profile_writer)
             except Exception:
                 continue
 

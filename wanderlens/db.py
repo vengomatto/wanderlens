@@ -201,6 +201,17 @@ CREATE TABLE IF NOT EXISTS destination_image_embeddings (
     PRIMARY KEY (destination_id, model)
 );
 
+CREATE TABLE IF NOT EXISTS destination_profiles (
+    destination_id  TEXT    NOT NULL,
+    input_hash      TEXT    NOT NULL,
+    model           TEXT,
+    prompt_version  TEXT,
+    payload         TEXT    NOT NULL,
+    source          TEXT,
+    fetched_at      TEXT,
+    PRIMARY KEY (destination_id, input_hash)
+);
+
 CREATE TABLE IF NOT EXISTS destination_climate (
     destination_id  TEXT PRIMARY KEY,
     climate         TEXT,

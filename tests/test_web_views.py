@@ -350,6 +350,23 @@ def test_destination_detail_has_photo_links(tmp_path):
     assert {"Wikimedia Commons", "Getty Images", "Google Images"} <= labels
 
 
+def test_destination_shows_profile(tmp_path):
+    import json
+
+    conn = _seed(tmp_path)
+    conn.execute(
+        "INSERT INTO destination_profiles (destination_id, input_hash, payload, source, fetched_at) "
+        "VALUES ('wy:algarve', 'h', ?, 'llm', 'now')",
+        (json.dumps({"vibe": {"coastal": 0.9}, "typical_stay_days": 5, "estimated": ["typical_stay_days"], "source": "llm"}),),
+    )
+    conn.commit()
+
+    detail = views.destination_detail(conn, 1, "wy:algarve")
+
+    assert detail.profile["typical_stay_days"] == 5
+    assert detail.profile["vibe"]["coastal"] == 0.9
+
+
 def test_destination_shows_climate_fit(tmp_path):
     conn = _seed(tmp_path)
     conn.execute(
