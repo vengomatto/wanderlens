@@ -24,6 +24,14 @@ def test_multiword_synonyms_match_as_sequence():
     assert "cliffs" in canonicalize("rugged rocky shore views")
 
 
+def test_old_town_does_not_imply_city():
+    attributes = canonicalize("old town")
+    assert "old_town" in attributes
+    assert "city" not in attributes
+
+    assert "city" in canonicalize("a city with an old town")
+
+
 def test_stem_prefix_matches():
     assert "history" in canonicalize("an archaeological site")
 

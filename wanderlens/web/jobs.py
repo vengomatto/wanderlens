@@ -30,7 +30,7 @@ class JobRunner:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 return None
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=30.0)
             cursor = conn.execute(
                 "INSERT INTO jobs (kind, status, progress, message, created_at, updated_at) "
                 "VALUES (?, 'queued', 0, '', ?, ?)",
@@ -66,7 +66,7 @@ class JobRunner:
         fields.append("updated_at = ?")
         values.append(_now())
         values.append(job_id)
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.execute(f"UPDATE jobs SET {', '.join(fields)} WHERE id = ?", values)
         conn.commit()
         conn.close()

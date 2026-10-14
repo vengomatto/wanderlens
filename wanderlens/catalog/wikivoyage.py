@@ -14,7 +14,16 @@ _SKIP_PREFIXES = ("file:", "image:", "category:")
 _TEMPLATE_RE = re.compile(
     r"\{\{\s*(?:marker|listing|see|do|go|sleep|eat|drink|buy|around)\b([^}]*)\}\}", re.I
 )
+_PARAM_RE = re.compile(r"([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*((?:[^|{}\[\]]|\[\[[^\]]*\]\])*)")
 _LINK_RE = re.compile(r"\[\[([^\]|#]+)")
+
+
+def _template_params(body: str) -> dict[str, str]:
+    """Parse template params without splitting on '|' inside [[links]]."""
+    params: dict[str, str] = {}
+    for key, value in _PARAM_RE.findall(body):
+        params.setdefault(key.strip().lower(), value.strip())
+    return params
 
 
 def _section_body(wikitext: str, section: str) -> str:
@@ -31,14 +40,19 @@ def _to_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _clean_title(value: str) -> str:
+    """Strip wiki link markup and fragments from a marker's name value."""
+    value = (value or "").strip()
+    link = re.search(r"\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]", value)
+    if link:
+        value = (link.group(2) or link.group(1)).strip()
+    return value.split("#", 1)[0].strip()
+
+
 def _template_entry(template: str, granularity: str) -> Optional[dict]:
     body = template[2:-2] if template.endswith("}}") else template
-    params: dict[str, str] = {}
-    for part in body.split("|"):
-        if "=" in part:
-            key, val = part.split("=", 1)
-            params[key.strip().lower()] = val.strip()
-    title = params.get("name") or params.get("title")
+    params = _template_params(body)
+    title = _clean_title(params.get("name") or params.get("title"))
     if not title:
         return None
     return {

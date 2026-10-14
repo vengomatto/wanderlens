@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+import time
 
 import numpy as np
 from fastapi.testclient import TestClient
@@ -9,6 +10,7 @@ from PIL import Image
 from wanderlens.config import Config
 from wanderlens.db import connect, init_db
 from wanderlens.web.app import create_app
+from wanderlens.web.jobs import latest_job
 
 
 def _config(tmp_path):
@@ -172,6 +174,46 @@ def test_jobs_latest_and_profile_pipeline(tmp_path):
     body = client.get("/").text
     assert "Pipeline" in body
     assert "Run ingest" in body
+
+
+def test_slash_destination_id_is_routable(tmp_path):
+    config = _seed(_config(tmp_path))
+    conn = connect(config.db_path)
+    conn.execute(
+        "INSERT INTO recommendations (user_id, run_id, rank, destination_id, score, "
+        "destination_name, destination_country, destination_lat, destination_lon) "
+        "VALUES (1, 1, 2, 'wv:London/Wandsworth', 0.5, 'Wandsworth', 'United Kingdom', 51.45, -0.19)"
+    )
+    conn.commit()
+    conn.close()
+    client = _client(config)
+
+    assert client.get("/destinations/wv:London/Wandsworth").status_code == 200
+    response = client.post(
+        "/destinations/wv:London/Wandsworth/feedback?action=like",
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 200
+
+
+def test_failed_job_does_not_lock_db(tmp_path):
+    config = _seed(_config(tmp_path))
+    app = create_app(config)
+    app.state.job_runner.submit("ingest", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    for _ in range(80):
+        conn = connect(config.db_path)
+        job = latest_job(conn)
+        conn.close()
+        if job and job["status"] in {"error", "done"}:
+            break
+        time.sleep(0.05)
+
+    client = TestClient(app)
+    response = client.post(
+        "/destinations/wy:algarve/feedback?action=like", headers={"HX-Request": "true"}
+    )
+    assert response.status_code == 200
 
 
 def test_profile_page_renders(tmp_path):

@@ -88,6 +88,20 @@ WIKITEXT_V2 = """
 """
 
 
+def test_marker_name_markup_is_cleaned():
+    from wanderlens.catalog.wikivoyage import parse_section_entries
+
+    body = (
+        "* {{marker|name=[[Rome]]|lat=41.9|long=12.5|wikidata=Q220}}\n"
+        "* {{marker|name=[[Naples|Napoli]]|lat=40.8|long=14.2}}"
+    )
+    entries = parse_section_entries(body, "city")
+
+    assert entries[0]["title"] == "Rome"
+    assert entries[1]["title"] == "Napoli"
+    assert entries[0]["qid"] == "Q220"
+
+
 def test_section_entries_parse_templates_and_drop_noise():
     from wanderlens.catalog.wikivoyage import country_destination_entries
 

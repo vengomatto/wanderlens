@@ -79,7 +79,7 @@
       <button class="fb fb-save" type="submit">Run recommend</button>
     </form>
   </div>
-  <div class="job-live" hx-get="/jobs/latest" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+  <div class="job-live" hx-get="/jobs/latest" hx-target="this" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
 </section>
 
 <section class="card">

@@ -101,11 +101,17 @@ def canonicalize(tag: str) -> list[str]:
     if not tokens:
         return []
     token_set = set(tokens)
-    return [
+    matches = [
         canonical
         for canonical, synonyms in VOCABULARY.items()
         if _matches(tokens, token_set, synonyms)
     ]
+    # "town" inside "old town" must not also imply a generic city.
+    if "old_town" in matches and "city" in matches:
+        strong_city = {"city", "urban", "skyline", "metropolis", "downtown"}
+        if not (token_set & strong_city):
+            matches.remove("city")
+    return matches
 
 
 def canonical_set(tags) -> set[str]:

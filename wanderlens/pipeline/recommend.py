@@ -299,6 +299,7 @@ def run_recommend(
         recency_half_life_days=float(getattr(config, "recency_half_life_days", 0.0)),
     )
     if not facets and taste is None:
+        conn.close()
         return []
 
     if embedder is None:
@@ -519,6 +520,7 @@ def run_recommend(
             fetcher(conn, recommendations, config)
         except Exception:
             pass
+    conn.close()
     return recommendations
 
 

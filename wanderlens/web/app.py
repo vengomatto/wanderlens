@@ -164,7 +164,7 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             raise HTTPException(status_code=404, detail="Trip not found")
         return render(request, "trip.html", active="profile", detail=detail)
 
-    @app.get("/destinations/{destination_id}", response_class=HTMLResponse)
+    @app.get("/destinations/{destination_id:path}", response_class=HTMLResponse)
     def destination(request: Request, destination_id: str) -> HTMLResponse:
         conn = connect(app.state.config.db_path)
         try:
@@ -203,7 +203,7 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             map_payload=map_payload,
         )
 
-    @app.post("/destinations/{destination_id}/feedback")
+    @app.post("/destinations/{destination_id:path}/feedback")
     def destination_feedback(request: Request, destination_id: str, action: str = "", reason: str = ""):
         conn = connect(app.state.config.db_path)
         try:
@@ -258,7 +258,7 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             conn.close()
         return RedirectResponse(url="/", status_code=303)
 
-    @app.get("/destination-image/{destination_id}/{position}")
+    @app.get("/destination-image/{destination_id:path}/{position}")
     def destination_image(request: Request, destination_id: str, position: int) -> FileResponse:
         conn = connect(app.state.config.db_path)
         try:
