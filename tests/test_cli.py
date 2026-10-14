@@ -115,6 +115,12 @@ def test_recommend_anti_match_and_candidates_flags_parse():
     assert args.candidates == 300
 
 
+def test_recommend_rerank_flag_parses():
+    parser = build_parser()
+    assert parser.parse_args(["recommend", "--rerank"]).rerank is True
+    assert parser.parse_args(["recommend"]).rerank is False
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],

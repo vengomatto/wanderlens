@@ -115,6 +115,11 @@ def test_feedback_bias_is_deterministic(tmp_path):
     assert np.allclose(first, second)
 
 
+class RaisingRanker:
+    def rank(self, recommendations, profile):
+        raise RuntimeError("no")
+
+
 class FakeRanker:
     def rank(self, recommendations, profile):
         for rank, rec in enumerate(recommendations, start=1):
@@ -657,4 +662,14 @@ def test_run_recommend_applies_travel_range(tmp_path):
     ids = [r.destination.id for r in recs]
     assert "Coastland" in ids
     assert "Peakville" not in ids
+
+
+def test_reranker_failure_falls_back(tmp_path):
+    config = _seed(tmp_path)
+    catalog = JsonCatalog(DESTINATIONS)
+
+    recs = run_recommend(config, embedder=FakeEmbedder(), catalog=catalog, ranker=RaisingRanker())
+
+    assert recs
+    assert all(rec.explanation for rec in recs)
 

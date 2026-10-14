@@ -140,6 +140,10 @@ destinations that match only catalog-common attributes absent from your history;
 `WANDERLENS_RECENCY_HALF_LIFE_DAYS=365` decays older trips' weight in the taste
 facets.
 
+**Optional smart layer:** `recommend --rerank` (needs a key) sends the final
+recommendations to the hosted model to reorder them and write a grounded one-line
+reason each; on error it falls back to the deterministic order and explanations.
+
 **Destination profiles:** `recommend --profiles` builds a structured profile per
 destination (vibe scores, typical stay, family/walkability/base-camp suitability)
 — a keyless baseline from its attributes always, model-enriched and cached when a

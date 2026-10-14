@@ -130,6 +130,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="candidate pre-filter size before the final ranking",
     )
+    p_rec.add_argument(
+        "--rerank",
+        action="store_true",
+        help="reorder the final recommendations with the hosted model (needs a key)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -296,6 +301,15 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
             profile_writer = HostedProfileWriter(config.api_key, config.llm_model)
 
+    ranker = None
+    if args.rerank:
+        if config.api_key:
+            from wanderlens.models.ranker import HostedRanker
+
+            ranker = HostedRanker(config.api_key, config.llm_model)
+        else:
+            print("No API key configured; skipping re-ranking.")
+
     recs = run_recommend(
         config,
         user_name=args.user,
@@ -312,6 +326,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         image_matching=args.image_matching or config.image_matching,
         profiles=args.profiles or config.build_profiles,
         profile_writer=profile_writer,
+        ranker=ranker,
     )
     if not recs:
         print("No recommendations.")

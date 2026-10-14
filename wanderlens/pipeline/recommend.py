@@ -452,8 +452,14 @@ def run_recommend(
     visited_country = (
         max(profile.geography, key=profile.geography.get) if profile.geography else None
     )
+    reranked = None
     if ranker is not None:
-        recommendations = ranker.rank(recommendations, profile)
+        try:
+            reranked = ranker.rank(recommendations, profile)
+        except Exception:
+            reranked = None
+    if reranked is not None:
+        recommendations = reranked
     else:
         for rec in recommendations:
             rec.explanation = _explain(
