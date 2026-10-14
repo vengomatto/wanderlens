@@ -209,6 +209,13 @@ def test_feedback_post_redirects_without_htmx(tmp_path):
     assert response.status_code == 303
 
 
+def test_discover_page_renders(tmp_path):
+    config = _seed(_config(tmp_path))
+    body = _client(config).get("/discover").text
+    assert "Discover" in body
+    assert "disc-card" in body
+
+
 def test_recommendations_grid_toggle(tmp_path):
     config = _seed(_config(tmp_path))
     body = _client(config).get("/recommendations").text

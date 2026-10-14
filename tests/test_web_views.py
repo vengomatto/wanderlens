@@ -361,6 +361,18 @@ def test_saved_view_lists_likes(tmp_path):
     assert items[0].reason == "a good base"
 
 
+def test_discover_excludes_rated(tmp_path):
+    conn = _seed(tmp_path)
+
+    first = [rec.destination_id for rec in views.discover_view(conn, 1)]
+    assert {"wy:algarve", "wy:epirus"} <= set(first)
+
+    views.record_feedback(conn, 1, "wy:algarve", "like")
+    after = [rec.destination_id for rec in views.discover_view(conn, 1)]
+    assert "wy:algarve" not in after
+    assert "wy:epirus" in after
+
+
 def test_recommendations_use_latest_run_and_mark_new(tmp_path):
     conn = _seed(tmp_path)
     conn.execute(

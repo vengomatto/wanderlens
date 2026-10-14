@@ -660,6 +660,16 @@ main {
 .rec-grid .rec-hero { min-height: 180px; }
 .rec-grid .rec-gauge { display: none; }
 
+/* Discover triage stack */
+[x-cloak] { display: none !important; }
+.discover { max-width: 640px; margin: 0 auto; }
+.disc-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; }
+.disc-hero { display: block; min-height: 320px; overflow: hidden; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.disc-hero img { width: 100%; height: 320px; object-fit: cover; display: block; }
+.disc-body { padding: 1rem 1.2rem 1.2rem; }
+.disc-body h2 { margin: 0 0 0.4rem; }
+.disc-count { text-align: center; margin-top: 0.6rem; }
+
 /* Estimated badge + profile facts */
 .estimated {
   font-size: 0.66rem;

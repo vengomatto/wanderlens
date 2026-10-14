@@ -216,7 +216,9 @@ localhost and single-user; front-end assets are vendored so it works offline.
 
 Recommendations can be viewed as an **image-tile grid** (with a list toggle), and
 a **Saved** board lists the places you liked or saved (with the reason you gave),
-straight from the database.
+straight from the database. **Discover** presents a card stack of unrated
+candidates — react with like/save/skip/dislike (arrow keys or buttons) — which
+feeds the same feedback loop.
 
 Recommendations now carry **pictures and a real destination page**. When you run
 `recommend`, each recommended Destination also fetches a Wikipedia image, an

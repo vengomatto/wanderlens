@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Discover · Wanderlens{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Discover</h1>
+  <p class="sub">React to places you haven't rated yet.</p>
+</section>
+
+{% if not items %}
+<div class="empty">
+  <p>Nothing left to discover.</p>
+  <p>Run <code>wanderlens recommend</code> for new candidates.</p>
+</div>
+{% else %}
+<div class="discover"
+     x-data="{ i: 0 }"
+     @keydown.window.arrow-right="if (i < {{ items | length }}) i++"
+     @keydown.window.arrow-left="if (i > 0) i--">
+  {% for item in items %}
+  <article class="disc-card" x-show="i === {{ loop.index0 }}"{% if not loop.first %} x-cloak{% endif %}>
+    <a class="disc-hero" href="/destinations/{{ item.destination_id | urlencode }}">
+      {% if item.has_image %}
+      <img src="/destination-image/{{ item.destination_id | urlencode }}/0" alt="{{ item.name }}" loading="lazy">
+      {% else %}
+      <span class="rec-hero-placeholder">{{ item.name[:1] | upper }}</span>
+      {% endif %}
+    </a>
+    <div class="disc-body">
+      <h2>{{ item.name }}{% if item.country %} <span class="country">{{ item.country }}</span>{% endif %}</h2>
+      {% if item.case_snippet %}<p class="case-snippet">{{ item.case_snippet }}</p>{% elif item.explanation %}<p class="why">{{ item.explanation }}</p>{% endif %}
+      <div class="feedback">
+        {% for action in ['like', 'save', 'skip', 'dislike'] %}
+        <button type="button" class="fb fb-{{ action }}"
+          hx-post="/destinations/{{ item.destination_id | urlencode }}/feedback?action={{ action }}"
+          hx-swap="none" @click="i++">{{ action }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+  <p class="muted disc-count" x-text="(Math.min(i + 1, {{ items | length }})) + ' / {{ items | length }}'"></p>
+</div>
+{% endif %}
+{% endblock %}

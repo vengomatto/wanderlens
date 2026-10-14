@@ -385,6 +385,14 @@ def saved_view(conn: sqlite3.Connection, user_id: int) -> list["SavedView"]:
     ]
 
 
+def discover_view(conn: sqlite3.Connection, user_id: int, limit: int = 25) -> list[RecView]:
+    from wanderlens.pipeline.recommend import load_feedback
+
+    rated = set(load_feedback(conn, user_id))
+    recs = recommendations_view(conn, user_id)
+    return [rec for rec in recs if rec.destination_id not in rated][:limit]
+
+
 def latest_run_id(conn: sqlite3.Connection, user_id: int) -> int:
     row = conn.execute(
         "SELECT COALESCE(MAX(run_id), 0) FROM recommendations WHERE user_id = ?", (user_id,)
