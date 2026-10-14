@@ -43,16 +43,19 @@ def load_taste_facets(
     user_id: int,
     exclude_trip_id: Optional[int] = None,
     min_photos: int = 4,
+    recency_half_life_days: float = 0.0,
 ) -> list[Facet]:
     """One normalized embedding centroid per trip (the taste facets), with the
     trip's label so the closest visit can be named.
 
     A trip's facet is weighted by ``min(1, n / min_photos)`` so a trip built on
-    one or two photos is not treated as a robust centroid.
+    one or two photos is not treated as a robust centroid, and optionally decays
+    by age when a recency half-life is set.
     """
     rows = conn.execute(
         """
-        SELECT tp.trip_id AS trip_id, tr.country AS country, tr.city AS city, pe.vector AS vector
+        SELECT tp.trip_id AS trip_id, tr.country AS country, tr.city AS city,
+               tr.start_at AS start_at, pe.vector AS vector
         FROM trip_photos tp
         JOIN photo_embeddings pe
           ON pe.user_id = tp.user_id AND pe.photo_id = tp.photo_id
@@ -64,6 +67,7 @@ def load_taste_facets(
     ).fetchall()
     groups: dict[int, list[np.ndarray]] = {}
     labels: dict[int, str] = {}
+    started: dict[int, str] = {}
     for row in rows:
         if exclude_trip_id is not None and row["trip_id"] == exclude_trip_id:
             continue
@@ -75,11 +79,14 @@ def load_taste_facets(
                 ", ".join(p for p in (row["city"], row["country"]) if p)
                 or f"trip {row['trip_id']}"
             )
+        if row["start_at"]:
+            started[row["trip_id"]] = row["start_at"]
     facets: list[Facet] = []
     for trip_id, vectors in groups.items():
         mean = np.mean(np.stack(vectors), axis=0).astype(np.float32)
         norm = np.linalg.norm(mean)
         weight = 1.0 if min_photos <= 0 else min(1.0, len(vectors) / min_photos)
+        weight *= _recency_factor(started.get(trip_id), recency_half_life_days)
         facets.append(
             Facet(
                 trip_id=trip_id,
@@ -89,6 +96,20 @@ def load_taste_facets(
             )
         )
     return facets
+
+
+def _recency_factor(start_at: Optional[str], half_life_days: float) -> float:
+    if not start_at or half_life_days <= 0:
+        return 1.0
+    try:
+        started = datetime.fromisoformat(start_at)
+    except ValueError:
+        return 1.0
+    now = datetime.now(timezone.utc)
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    age_days = max(0.0, (now - started).total_seconds() / 86400.0)
+    return 0.5 ** (age_days / half_life_days)
 
 
 def ensure_destination_embeddings(conn, destinations, embedder, model=None):
@@ -272,7 +293,10 @@ def run_recommend(
 
     taste = load_taste_embedding(conn, user_id)
     facets = load_taste_facets(
-        conn, user_id, min_photos=int(getattr(config, "facet_min_photos", 4))
+        conn,
+        user_id,
+        min_photos=int(getattr(config, "facet_min_photos", 4)),
+        recency_half_life_days=float(getattr(config, "recency_half_life_days", 0.0)),
     )
     if not facets and taste is None:
         return []
@@ -332,7 +356,9 @@ def run_recommend(
         build_climate_profile(conn, user_id, session=session)
         climate_profile = load_climate_profile(conn, user_id)
 
-    shortlist_size = min(len(candidates), max(count * 4, 20))
+    shortlist_size = min(
+        len(candidates), max(count * 4, int(getattr(config, "candidate_prefilter", 20)))
+    )
     shortlist = rank_destinations(
         taste,
         candidates,
@@ -393,6 +419,7 @@ def run_recommend(
         calibrate=getattr(config, "calibrate", False),
         taste_bias=taste_bias,
         taste_bias_weight=getattr(config, "taste_bias_weight", 0.0),
+        anti_match_weight=getattr(config, "anti_match_weight", 0.0),
     )
 
     if diagnose:

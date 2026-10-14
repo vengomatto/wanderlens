@@ -86,6 +86,19 @@ def attribute_idf(destinations: Iterable[Destination]) -> dict[str, float]:
     return {attribute: value / mean for attribute, value in raw.items()}
 
 
+def _common_attributes(destinations) -> set[str]:
+    """Attributes present in more than half the pool (generic, low-specificity)."""
+    attribute_sets = [destination_attribute_set(d) for d in destinations]
+    count = len(attribute_sets)
+    if not count:
+        return set()
+    frequency: dict[str, int] = {}
+    for attributes in attribute_sets:
+        for attribute in attributes:
+            frequency[attribute] = frequency.get(attribute, 0) + 1
+    return {attribute for attribute, n in frequency.items() if n > count / 2}
+
+
 def nearest_visited_km(
     destination: Destination, centers: Iterable[tuple[float, float]]
 ) -> Optional[float]:
@@ -246,6 +259,7 @@ def rank_destinations(
     calibrate: bool = False,
     taste_bias: Optional[object] = None,
     taste_bias_weight: float = 0.0,
+    anti_match_weight: float = 0.0,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -263,6 +277,8 @@ def rank_destinations(
     destinations = list(destinations)
     idf = attribute_idf(destinations) if taste_tags else {}
     pool_labels = percentile_labels(popularity) if popularity else {}
+    common = _common_attributes(destinations) if anti_match_weight else set()
+    profile_attributes = set(taste_tags) if taste_tags else set()
     scored: list[tuple] = []
     for destination in destinations:
         if destination.country.lower() in excluded:
@@ -325,6 +341,15 @@ def rank_destinations(
 
         if taste_bias is not None and taste_bias_weight:
             delta += taste_bias_weight * float(np.dot(vector, taste_bias))
+
+        if anti_match_weight and common:
+            attrs = destination_attribute_set(destination)
+            if attrs:
+                unmatched = sum(
+                    1 for attribute in attrs
+                    if attribute in common and attribute not in profile_attributes
+                )
+                delta -= anti_match_weight * min(1.0, unmatched / len(attrs))
 
         if taste_tags:
             base = alpha * embedding_score + (1.0 - alpha) * attribute_score

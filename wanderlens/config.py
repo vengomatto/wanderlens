@@ -53,6 +53,9 @@ class Config:
     catalog_min_extract: int = 0
     build_profiles: bool = False
     taste_bias_weight: float = 0.0
+    recency_half_life_days: float = 0.0
+    anti_match_weight: float = 0.0
+    candidate_prefilter: int = 20
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -225,6 +228,17 @@ def load_config(
         ),
         taste_bias_weight=float(
             values.get("taste_bias_weight") or env.get("WANDERLENS_TASTE_BIAS_WEIGHT") or 0.0
+        ),
+        recency_half_life_days=float(
+            values.get("recency_half_life_days")
+            or env.get("WANDERLENS_RECENCY_HALF_LIFE_DAYS")
+            or 0.0
+        ),
+        anti_match_weight=float(
+            values.get("anti_match_weight") or env.get("WANDERLENS_ANTI_MATCH_WEIGHT") or 0.0
+        ),
+        candidate_prefilter=int(
+            values.get("candidate_prefilter") or env.get("WANDERLENS_CANDIDATE_PREFILTER") or 20
         ),
     )
 

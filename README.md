@@ -134,6 +134,12 @@ vision, and is cached per destination. It is opt-in pending measurement on
 and attribute components across the candidate pool before blending, so neither
 term dominates by magnitude — also gated on `eval --loto`.
 
+**More tuning (all off by default):** `recommend --anti-match-weight 0.1` penalises
+destinations that match only catalog-common attributes absent from your history;
+`recommend --candidates 300` widens the pre-ranking pool; and
+`WANDERLENS_RECENCY_HALF_LIFE_DAYS=365` decays older trips' weight in the taste
+facets.
+
 **Destination profiles:** `recommend --profiles` builds a structured profile per
 destination (vibe scores, typical stay, family/walkability/base-camp suitability)
 — a keyless baseline from its attributes always, model-enriched and cached when a

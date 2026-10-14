@@ -118,6 +118,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="bias ranking by a learned feedback vector (0 = off)",
     )
+    p_rec.add_argument(
+        "--anti-match-weight",
+        type=float,
+        default=None,
+        help="penalty for matching only generic unmatched attributes (0 = off)",
+    )
+    p_rec.add_argument(
+        "--candidates",
+        type=int,
+        default=None,
+        help="candidate pre-filter size before the final ranking",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -247,6 +259,10 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     config.calibrate = config.calibrate or args.calibrate
     if args.taste_bias_weight is not None:
         config.taste_bias_weight = args.taste_bias_weight
+    if args.anti_match_weight is not None:
+        config.anti_match_weight = args.anti_match_weight
+    if args.candidates is not None:
+        config.candidate_prefilter = args.candidates
     if args.season:
         config.season = args.season
         config.climate = True

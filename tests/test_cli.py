@@ -108,6 +108,13 @@ def test_brief_flags_parse():
     assert args.max_travel_km == 800.0
 
 
+def test_recommend_anti_match_and_candidates_flags_parse():
+    parser = build_parser()
+    args = parser.parse_args(["recommend", "--anti-match-weight", "0.1", "--candidates", "300"])
+    assert args.anti_match_weight == 0.1
+    assert args.candidates == 300
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],
