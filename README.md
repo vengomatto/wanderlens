@@ -239,7 +239,8 @@ exists, an "approximate" circle otherwise — and your own most-similar trip pho
 
 Maps use **keyless** OpenStreetMap tiles by default (darkened in dark mode). To
 point them at another provider (including a keyed one), set `WANDERLENS_TILE_URL`
-and `WANDERLENS_TILE_ATTRIBUTION`.
+and `WANDERLENS_TILE_ATTRIBUTION`. Map markers link to the destination or trip
+they represent, and a destination's region map fits its drawn area.
 
 ### Travel guides
 

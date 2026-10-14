@@ -245,6 +245,13 @@ def test_feedback_post_redirects_without_htmx(tmp_path):
     assert response.status_code == 303
 
 
+def test_map_payload_has_marker_urls(tmp_path):
+    config = _seed(_config(tmp_path))
+    body = _client(config).get("/map").text
+    assert "/destinations/" in body
+    assert "/trips/" in body
+
+
 def test_discover_page_renders(tmp_path):
     config = _seed(_config(tmp_path))
     body = _client(config).get("/discover").text

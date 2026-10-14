@@ -11,7 +11,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 import numpy as np
 
@@ -200,6 +200,7 @@ class MapPoint:
     label: str
     lat: float
     lon: float
+    url: str = ""
 
 
 @dataclass
@@ -649,8 +650,20 @@ def map_points(conn: sqlite3.Connection, user_id: int) -> list[MapPoint]:
     points: list[MapPoint] = []
     for trip in trips_view(conn, user_id):
         if trip.lat is not None and trip.lon is not None:
-            points.append(MapPoint(kind="trip", label=trip.label, lat=trip.lat, lon=trip.lon))
+            points.append(
+                MapPoint(
+                    kind="trip", label=trip.label, lat=trip.lat, lon=trip.lon, url=f"/trips/{trip.id}"
+                )
+            )
     for rec in recommendations_view(conn, user_id):
         if rec.lat is not None and rec.lon is not None:
-            points.append(MapPoint(kind="destination", label=rec.name, lat=rec.lat, lon=rec.lon))
+            points.append(
+                MapPoint(
+                    kind="destination",
+                    label=rec.name,
+                    lat=rec.lat,
+                    lon=rec.lon,
+                    url=f"/destinations/{quote(rec.destination_id)}",
+                )
+            )
     return points

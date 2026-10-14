@@ -286,7 +286,7 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
         finally:
             conn.close()
         payload = [
-            {"kind": p.kind, "label": p.label, "lat": p.lat, "lon": p.lon} for p in points
+            {"kind": p.kind, "label": p.label, "lat": p.lat, "lon": p.lon, "url": p.url} for p in points
         ]
         return render(
             request, "map.html", active="map", points=points, points_payload=payload

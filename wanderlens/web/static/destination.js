@@ -61,7 +61,7 @@
         /* ignore */
       }
     } else if (hasPoint && data.region_kind === "approximate" && data.region_radius_km) {
-      L.circle([data.lat, data.lon], {
+      var circle = L.circle([data.lat, data.lon], {
         radius: data.region_radius_km * 1000,
         color: markerColor,
         weight: 2,
@@ -69,6 +69,15 @@
         fillColor: markerColor,
         fillOpacity: 0.12,
       }).addTo(rmap);
+      try {
+        var circleBounds = circle.getBounds();
+        bounds.push(
+          [circleBounds.getSouth(), circleBounds.getWest()],
+          [circleBounds.getNorth(), circleBounds.getEast()]
+        );
+      } catch (e) {
+        /* ignore */
+      }
     }
 
     (data.pois || []).forEach(function (poi) {

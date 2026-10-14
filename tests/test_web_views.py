@@ -361,6 +361,17 @@ def test_saved_view_lists_likes(tmp_path):
     assert items[0].reason == "a good base"
 
 
+def test_map_points_have_urls(tmp_path):
+    conn = _seed(tmp_path)
+
+    points = views.map_points(conn, 1)
+
+    destinations = [p for p in points if p.kind == "destination"]
+    trips = [p for p in points if p.kind == "trip"]
+    assert any(p.url.startswith("/destinations/") for p in destinations)
+    assert any(p.url.startswith("/trips/") for p in trips)
+
+
 def test_discover_excludes_rated(tmp_path):
     conn = _seed(tmp_path)
 

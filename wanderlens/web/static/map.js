@@ -13,13 +13,16 @@
   var bounds = [];
   points.forEach(function (p) {
     var color = p.kind === "destination" ? "#e0673f" : "#3f8fe0";
+    var popup = p.url
+      ? "<strong>" + p.label + "</strong><br><a href=\"" + p.url + "\">Open →</a>"
+      : "<strong>" + p.label + "</strong>";
     var marker = L.circleMarker([p.lat, p.lon], {
       radius: p.kind === "destination" ? 8 : 6,
       color: color,
       weight: 2,
       fillColor: color,
       fillOpacity: p.kind === "destination" ? 0.85 : 0.6,
-    }).bindPopup("<strong>" + p.label + "</strong>");
+    }).bindPopup(popup);
     marker.addTo(map);
     bounds.push([p.lat, p.lon]);
   });
