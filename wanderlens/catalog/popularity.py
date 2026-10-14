@@ -39,6 +39,14 @@ def fetch_pageviews(title: str, session=None, timeout: int = 30, months: int = 1
     return sum(int(item.get("views", 0)) for item in items)
 
 
+def article_title(destination) -> str:
+    """Exact Wikipedia article title for pageviews: the Wikivoyage title when the id
+    carries it, otherwise the display name."""
+    if destination.id.startswith("wv:"):
+        return destination.id[3:]
+    return destination.name
+
+
 def is_cached(conn: sqlite3.Connection, destination_id: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM destination_popularity WHERE destination_id = ?", (destination_id,)
@@ -59,7 +67,7 @@ def fetch_popularity_for(conn: sqlite3.Connection, destinations, session=None) -
                 scores[destination.id] = row["score"]
             continue
         try:
-            total = fetch_pageviews(destination.name, session=session)
+            total = fetch_pageviews(article_title(destination), session=session)
         except Exception:
             total = None
         score = normalize_popularity(total)

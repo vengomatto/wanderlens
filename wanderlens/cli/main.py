@@ -102,6 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="score candidates by destination image vectors (network; off by default)",
     )
+    p_rec.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="rescale score components per pool before blending (off by default)",
+    )
     p_rec.set_defaults(func=cmd_recommend)
 
     p_eval = sub.add_parser("eval", help="hold-out evaluation of the taste profile")
@@ -215,6 +220,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
     config = load_config(args.config)
     config.refresh_media = config.refresh_media or args.refresh_media
+    config.calibrate = config.calibrate or args.calibrate
     if args.season:
         config.season = args.season
         config.climate = True

@@ -169,6 +169,30 @@ def percentile_labels(scores: dict[str, float]) -> dict[str, str]:
     return labels
 
 
+def _minmax(values: list[float]) -> list[float]:
+    low, high = min(values), max(values)
+    if high <= low:
+        return [0.0 for _ in values]
+    return [(value - low) / (high - low) for value in values]
+
+
+def _calibrate(scored: list[tuple], alpha: float) -> None:
+    """Rescale embedding/attribute per pool so the blend is not scale-dominated."""
+    embedding_norm = _minmax([row[1] for row in scored])
+    has_attribute = any(row[2] is not None for row in scored)
+    attribute_norm = (
+        _minmax([row[2] if row[2] is not None else 0.0 for row in scored])
+        if has_attribute
+        else None
+    )
+    for index, row in enumerate(scored):
+        if row[2] is None or attribute_norm is None:
+            base = embedding_norm[index]
+        else:
+            base = alpha * embedding_norm[index] + (1.0 - alpha) * attribute_norm[index]
+        scored[index] = (base + row[10],) + row[1:]
+
+
 def _select(rows: list[tuple], top_k: Optional[int], diversity: float) -> list[tuple]:
     if not rows:
         return []
@@ -219,6 +243,7 @@ def rank_destinations(
     season: Optional[str] = None,
     best_months: Optional[dict[str, list]] = None,
     image_vectors: Optional[dict] = None,
+    calibrate: bool = False,
 ) -> list[Recommendation]:
     """Deterministic ranking, excluding visited countries.
 
@@ -275,32 +300,35 @@ def rank_destinations(
                 weight * idf.get(attribute, 1.0)
                 for attribute, weight in attributes.items()
             )
-            score = alpha * embedding_score + (1.0 - alpha) * attribute_score
         else:
             attributes = {}
             attribute_score = None
-            score = embedding_score
 
+        delta = 0.0
         pop = popularity.get(destination.id) if popularity else None
         if pop is not None and novelty in {"familiar", "uncommon"}:
-            delta = pop - 0.5
-            score += novelty_weight * delta * (1 if novelty == "familiar" else -1)
+            delta += novelty_weight * (pop - 0.5) * (1 if novelty == "familiar" else -1)
 
         action = feedback.get(destination.id) if feedback else None
         if action in {"like", "save"}:
-            score += feedback_weight
+            delta += feedback_weight
         elif action in {"dislike", "skip"}:
-            score -= feedback_weight
+            delta -= feedback_weight
 
         if climate is not None and climate_weight:
-            score += climate_weight * climate.get(destination.id, 0.0)
+            delta += climate_weight * climate.get(destination.id, 0.0)
         if season and best_months:
             if season_overlap(best_months.get(destination.id, []), season):
-                score += max(climate_weight, 0.05)
+                delta += max(climate_weight, 0.05)
+
+        if taste_tags:
+            base = alpha * embedding_score + (1.0 - alpha) * attribute_score
+        else:
+            base = embedding_score
 
         scored.append(
             (
-                score,
+                base + delta,
                 embedding_score,
                 attribute_score,
                 destination,
@@ -310,9 +338,13 @@ def rank_destinations(
                 attributes,
                 nearest_visited_km(destination, centers),
                 pop,
+                delta,
                 vector,
             )
         )
+
+    if calibrate and scored:
+        _calibrate(scored, alpha)
 
     ranked = _select(scored, top_k, diversity)
     return [
@@ -341,6 +373,7 @@ def rank_destinations(
             attributes,
             nearest,
             pop,
+            _delta,
             vector,
         ) in enumerate(ranked, start=1)
     ]

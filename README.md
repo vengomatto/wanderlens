@@ -130,6 +130,10 @@ photo-to-photo comparison rather than across modalities. It needs network and CL
 vision, and is cached per destination. It is opt-in pending measurement on
 `eval --loto`.
 
+**Calibration:** `recommend --calibrate` (off by default) rescales the embedding
+and attribute components across the candidate pool before blending, so neither
+term dominates by magnitude — also gated on `eval --loto`.
+
 `eval --synthetic` ranks a reproducible synthetic gallery and reports
 **precision@k / MRR**, so ranking changes can be measured without a large archive.
 `eval --loto` runs **leave-one-trip-out** evaluation over every trip and reports

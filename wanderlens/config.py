@@ -48,6 +48,7 @@ class Config:
     season: str = ""
     tag_provider: str = "clip"
     image_matching: bool = False
+    calibrate: bool = False
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -201,6 +202,11 @@ def load_config(
             bool(values.get("image_matching"))
             if "image_matching" in values
             else str(env.get("WANDERLENS_IMAGE_MATCHING", "")).lower() in {"1", "true", "yes", "on"}
+        ),
+        calibrate=(
+            bool(values.get("calibrate"))
+            if "calibrate" in values
+            else str(env.get("WANDERLENS_CALIBRATE", "")).lower() in {"1", "true", "yes", "on"}
         ),
     )
 

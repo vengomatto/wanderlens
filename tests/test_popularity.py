@@ -3,6 +3,17 @@ from wanderlens.core.models import Destination
 from wanderlens.core.recommend import normalize_popularity, percentile_labels, popularity_label
 
 
+def test_article_title_prefers_wikivoyage_title():
+    from wanderlens.catalog.popularity import article_title
+    from wanderlens.core.models import Destination
+
+    wikivoyage = Destination(id="wv:Kotor", name="Kotor (Montenegro)", lat=1, lon=1, country="X")
+    wikidata = Destination(id="wd:Q1", name="Kotor", lat=1, lon=1, country="X")
+
+    assert article_title(wikivoyage) == "Kotor"
+    assert article_title(wikidata) == "Kotor"
+
+
 def test_percentile_labels_split_roughly_thirds():
     scores = {f"d{i}": i / 10 for i in range(10)}
 

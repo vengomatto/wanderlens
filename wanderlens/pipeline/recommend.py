@@ -296,6 +296,7 @@ def run_recommend(
         visited_centers=centers,
         feedback=feedback,
         image_vectors=image_vectors,
+        calibrate=getattr(config, "calibrate", False),
     )
 
     shortlist_climate: dict[str, float] = {}
@@ -340,6 +341,7 @@ def run_recommend(
         season=getattr(config, "season", "") or None,
         best_months=shortlist_best_months or None,
         image_vectors=image_vectors,
+        calibrate=getattr(config, "calibrate", False),
     )
 
     if diagnose:

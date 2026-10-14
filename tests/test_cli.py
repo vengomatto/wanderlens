@@ -81,6 +81,11 @@ def test_recommend_image_matching_flag_parses():
     assert parser.parse_args(["recommend", "--image-matching"]).image_matching is True
 
 
+def test_recommend_calibrate_flag_parses():
+    parser = build_parser()
+    assert parser.parse_args(["recommend", "--calibrate"]).calibrate is True
+
+
 def test_module_entrypoint_help():
     result = subprocess.run(
         [sys.executable, "-m", "wanderlens", "--help"],
