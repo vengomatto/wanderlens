@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Wanderlens{% endblock %}</title>
   <meta name="htmx-config" content='{"globalViewTransitions": true}'>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23e0562f'/%3E%3C/svg%3E">
   <script>window.__tiles = {{ (tiles or {}) | tojson }};</script>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body hx-boost="true" hx-target="main" hx-swap="innerHTML">
   <header class="topbar">
     <a class="brand" href="/"><span class="dot"></span>Wanderlens</a>
     <nav hx-boost="true">

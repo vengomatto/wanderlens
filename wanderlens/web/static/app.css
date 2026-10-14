@@ -595,3 +595,48 @@ main {
   .dest-hero-text { right: 1.4rem; }
   .gallery figure:nth-child(6n + 1) { grid-column: span 1; grid-row: span 1; }
 }
+
+/* Feedback controls */
+.feedback { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
+.fb {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.fb:hover { color: var(--ink); border-color: var(--accent); }
+.fb.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fb-like.active, .fb-save.active { background: var(--accent-2); border-color: var(--accent-2); }
+.fb-dislike.active, .fb-skip.active { background: #b23b3b; border-color: #b23b3b; }
+
+/* Estimated badge + profile facts */
+.estimated {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  vertical-align: middle;
+}
+.profile-facts { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.9rem; margin: 0.75rem 0 0; }
+.profile-facts dt { color: var(--muted); font-size: 0.9rem; }
+.profile-facts dd { margin: 0; }
+
+/* Mobile robustness: no horizontal overflow, wrapping nav, single column */
+main, .dest-grid, .rec-body, .card { min-width: 0; }
+img { max-width: 100%; height: auto; }
+@media (max-width: 660px) {
+  body { overflow-x: hidden; }
+  .topbar { flex-wrap: wrap; gap: 0.4rem; }
+  .topbar nav { flex-wrap: wrap; }
+  .dest-grid { grid-template-columns: 1fr; }
+}

@@ -130,16 +130,25 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
             map_payload=map_payload,
         )
 
-    @app.get("/destinations/{destination_id}/feedback")
-    def destination_feedback(destination_id: str, action: str = "") -> RedirectResponse:
+    @app.post("/destinations/{destination_id}/feedback")
+    def destination_feedback(request: Request, destination_id: str, action: str = ""):
         conn = connect(app.state.config.db_path)
         try:
             _open(conn)
             user_id = views.resolve_user(conn, app.state.user_name)
+            current = ""
             if user_id is not None:
                 views.record_feedback(conn, user_id, destination_id, action)
+                current = views.feedback_action(conn, user_id, destination_id)
         finally:
             conn.close()
+        if request.headers.get("HX-Request"):
+            return render(
+                request,
+                "_feedback.html",
+                destination_id=destination_id,
+                feedback_action=current,
+            )
         return RedirectResponse(url=f"/destinations/{destination_id}", status_code=303)
 
     @app.get("/destination-image/{destination_id}/{position}")

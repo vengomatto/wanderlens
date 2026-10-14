@@ -1,0 +1,8 @@
+<div class="feedback">
+  {% for action in ['like', 'save', 'dislike', 'skip'] %}
+  <button type="button"
+    class="fb fb-{{ action }}{% if feedback_action == action %} active{% endif %}"
+    hx-post="/destinations/{{ destination_id | urlencode }}/feedback?action={{ action }}"
+    hx-target="closest .feedback" hx-swap="outerHTML">{{ action }}</button>
+  {% endfor %}
+</div>

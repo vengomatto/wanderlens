@@ -149,6 +149,34 @@ def test_profile_page_renders(tmp_path):
     assert "/photos/u1-p0" in body
 
 
+def test_feedback_post_records_and_returns_fragment(tmp_path):
+    import sqlite3
+
+    config = _seed(_config(tmp_path))
+    client = _client(config)
+
+    response = client.post(
+        "/destinations/wy:algarve/feedback?action=like", headers={"HX-Request": "true"}
+    )
+
+    assert response.status_code == 200
+    assert 'fb-like active' in response.text
+    conn = sqlite3.connect(config.db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT action FROM feedback WHERE user_id = 1 AND destination_id = 'wy:algarve'"
+    ).fetchone()
+    assert row["action"] == "like"
+
+
+def test_feedback_post_redirects_without_htmx(tmp_path):
+    config = _seed(_config(tmp_path))
+    response = _client(config).post(
+        "/destinations/wy:algarve/feedback?action=save", follow_redirects=False
+    )
+    assert response.status_code == 303
+
+
 def test_recommendations_page_renders(tmp_path):
     config = _seed(_config(tmp_path))
     response = _client(config).get("/recommendations")
