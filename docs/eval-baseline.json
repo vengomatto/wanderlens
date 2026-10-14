@@ -1,8 +1,9 @@
 {
   "trips": 6,
-  "mrr": 0.001,
+  "mrr": 0.0,
   "recall@10": 0.0,
   "recall@50": 0.0,
-  "margin": 0.05,
-  "note": "Leave-one-trip-out baseline recorded 2026-10-13 after the CLIP truncation fix (collapsed_share 0.0). Low absolute values reflect the thin, Europe-only catalog (IMPROVEMENT_PLAN workstream B), not a regression gate to relax."
+  "margin": 0.1,
+  "floor": 0.05,
+  "note": "Leave-one-trip-out baseline recorded 2026-10-14 after the catalog fix (396 destinations, clean names). MRR is 0.0: held-out trips do not resurface, so the relative gate (floor 0.05) is currently RED — an honest failing gate that the catalog/ranking work must lift, not relax."
 }

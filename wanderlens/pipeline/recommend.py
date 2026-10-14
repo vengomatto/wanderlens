@@ -623,3 +623,31 @@ def run_ingest_job(config, user_name: str = "owner"):
 
     run_ingest(config, user_name=user_name)
     return run_profile(config, user_name=user_name)
+
+
+def run_recommend_ui(config, user_name: str = "owner", count: int = 8, media: bool = True):
+    """Recommend with the CLI's default option set, for the dashboard job."""
+    from wanderlens.catalog.search import DuckDuckGoSearchProvider
+    from wanderlens.models.case import HostedCaseWriter
+    from wanderlens.models.ranker import HostedExplanationSynthesizer
+
+    searcher = writer = explainer = None
+    if getattr(config, "build_case", False):
+        searcher = DuckDuckGoSearchProvider()
+        if config.api_key:
+            writer = HostedCaseWriter(config.api_key, config.llm_model)
+    if getattr(config, "explain_llm", False) and config.api_key:
+        explainer = HostedExplanationSynthesizer(config.api_key, config.llm_model)
+
+    return run_recommend(
+        config,
+        user_name=user_name,
+        count=count,
+        media=media,
+        explainer=explainer,
+        diversity=0.25,
+        novelty="balanced",
+        popularity=True,
+        case_searcher=searcher,
+        case_writer=writer,
+    )

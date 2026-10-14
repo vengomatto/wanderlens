@@ -31,7 +31,7 @@
       <div class="feedback">
         {% for action in ['like', 'save', 'skip', 'dislike'] %}
         <button type="button" class="fb fb-{{ action }}"
-          hx-post="/destinations/{{ item.destination_id | urlencode }}/feedback?action={{ action }}"
+          hx-post="/destinations/{{ item.destination_id | urlencode }}/feedback?action={{ action }}&token={{ post_token }}"
           hx-swap="none" @click="i++">{{ action }}</button>
         {% endfor %}
       </div>

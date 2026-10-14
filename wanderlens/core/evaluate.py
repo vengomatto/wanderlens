@@ -77,9 +77,23 @@ def mean_reciprocal_rank(ranks) -> float:
     return sum(1.0 / rank for rank in ranks if rank) / len(ranks)
 
 
-def check_regression(mrr_value: float, baseline_mrr: float, margin: float = 0.05) -> bool:
-    """True when ``mrr_value`` is within ``margin`` of the baseline (no regression)."""
-    return mrr_value >= baseline_mrr - margin
+def check_regression(
+    mrr_value: float,
+    baseline_mrr: float,
+    margin: float = 0.1,
+    relative: bool = True,
+    floor: float = 0.05,
+) -> bool:
+    """True when ``mrr_value`` is within ``margin`` of the baseline.
+
+    The effective baseline is at least ``floor`` so a near-zero recorded baseline
+    cannot make the gate impossible to fail. With ``relative`` the margin is a
+    fraction of the baseline.
+    """
+    effective = max(baseline_mrr, floor)
+    if relative:
+        return mrr_value >= effective * (1.0 - margin)
+    return mrr_value >= effective - margin
 
 
 def collapsed_share(vectors) -> float:

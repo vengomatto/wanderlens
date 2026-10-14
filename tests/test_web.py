@@ -190,7 +190,7 @@ def test_slash_destination_id_is_routable(tmp_path):
 
     assert client.get("/destinations/wv:London/Wandsworth").status_code == 200
     response = client.post(
-        "/destinations/wv:London/Wandsworth/feedback?action=like",
+        f"/destinations/wv:London/Wandsworth/feedback?action=like&token={client.app.state.post_token}",
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
@@ -211,7 +211,8 @@ def test_failed_job_does_not_lock_db(tmp_path):
 
     client = TestClient(app)
     response = client.post(
-        "/destinations/wy:algarve/feedback?action=like", headers={"HX-Request": "true"}
+        f"/destinations/wy:algarve/feedback?action=like&token={app.state.post_token}",
+        headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
 
@@ -236,7 +237,7 @@ def test_brief_panel_and_save(tmp_path):
     assert "Trip brief" in client.get("/").text
 
     response = client.post(
-        "/brief",
+        f"/brief?token={client.app.state.post_token}",
         data={
             "adults": "2",
             "children": "1",
@@ -266,7 +267,8 @@ def test_feedback_post_records_and_returns_fragment(tmp_path):
     client = _client(config)
 
     response = client.post(
-        "/destinations/wy:algarve/feedback?action=like", headers={"HX-Request": "true"}
+        f"/destinations/wy:algarve/feedback?action=like&token={client.app.state.post_token}",
+        headers={"HX-Request": "true"},
     )
 
     assert response.status_code == 200
@@ -281,10 +283,20 @@ def test_feedback_post_records_and_returns_fragment(tmp_path):
 
 def test_feedback_post_redirects_without_htmx(tmp_path):
     config = _seed(_config(tmp_path))
-    response = _client(config).post(
-        "/destinations/wy:algarve/feedback?action=save", follow_redirects=False
+    client = _client(config)
+    response = client.post(
+        f"/destinations/wy:algarve/feedback?action=save&token={client.app.state.post_token}",
+        follow_redirects=False,
     )
     assert response.status_code == 303
+
+
+def test_feedback_and_brief_reject_missing_token(tmp_path):
+    config = _seed(_config(tmp_path))
+    client = _client(config)
+
+    assert client.post("/destinations/wy:algarve/feedback?action=like", headers={"HX-Request": "true"}).status_code == 403
+    assert client.post("/brief", data={"adults": "1"}).status_code == 403
 
 
 def test_map_payload_has_marker_urls(tmp_path):
@@ -313,7 +325,10 @@ def test_saved_page_renders_and_lists_saved(tmp_path):
 
     assert "Nothing saved yet" in client.get("/saved").text
 
-    client.post("/destinations/wy:algarve/feedback?action=save", headers={"HX-Request": "true"})
+    client.post(
+        f"/destinations/wy:algarve/feedback?action=save&token={client.app.state.post_token}",
+        headers={"HX-Request": "true"},
+    )
     body = client.get("/saved").text
     assert "Algarve" in body
 

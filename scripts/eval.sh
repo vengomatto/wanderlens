@@ -26,9 +26,10 @@ from wanderlens.core.evaluate import check_regression
 
 metrics = ast.literal_eval(sys.argv[1])
 baseline = json.load(open(sys.argv[2]))
-margin = baseline.get("margin", 0.05)
-print(f"MRR {metrics['mrr']} vs baseline {baseline.get('mrr')} (margin {margin})")
-if not check_regression(metrics["mrr"], baseline.get("mrr", 0.0), margin):
+margin = baseline.get("margin", 0.1)
+floor = baseline.get("floor", 0.05)
+print(f"MRR {metrics['mrr']} vs baseline {baseline.get('mrr')} (relative margin {margin}, floor {floor})")
+if not check_regression(metrics["mrr"], baseline.get("mrr", 0.0), margin, floor=floor):
     print("REGRESSION: MRR dropped beyond the margin", file=sys.stderr)
     sys.exit(1)
 print("eval OK")

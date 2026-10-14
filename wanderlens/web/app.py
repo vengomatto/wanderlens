@@ -121,11 +121,9 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
 
             fn = lambda: run_ingest_job(config, app.state.user_name)
         else:
-            from wanderlens.pipeline.recommend import run_recommend
+            from wanderlens.pipeline.recommend import run_recommend_ui
 
-            fn = lambda: run_recommend(
-                config, user_name=app.state.user_name, count=8, media=True, popularity=True
-            )
+            fn = lambda: run_recommend_ui(config, app.state.user_name, count=8, media=True)
         app.state.job_runner.submit(kind, fn)
         return RedirectResponse(url="/", status_code=303)
 
@@ -204,7 +202,9 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
         )
 
     @app.post("/destinations/{destination_id:path}/feedback")
-    def destination_feedback(request: Request, destination_id: str, action: str = "", reason: str = ""):
+    def destination_feedback(request: Request, destination_id: str, action: str = "", reason: str = "", token: str = ""):
+        if app.state.post_token and token != app.state.post_token:
+            raise HTTPException(status_code=403, detail="Bad token")
         conn = connect(app.state.config.db_path)
         try:
             _open(conn)
@@ -225,11 +225,13 @@ def create_app(config, user_name: str = "owner") -> FastAPI:
         return RedirectResponse(url=f"/destinations/{destination_id}", status_code=303)
 
     @app.post("/brief")
-    async def save_traveller_brief(request: Request):
+    async def save_traveller_brief(request: Request, token: str = ""):
         from urllib.parse import parse_qs
 
         from wanderlens.pipeline.brief import save_brief
 
+        if app.state.post_token and token != app.state.post_token:
+            raise HTTPException(status_code=403, detail="Bad token")
         raw = (await request.body()).decode("utf-8")
         form = {key: values[0] for key, values in parse_qs(raw).items()}
         conn = connect(app.state.config.db_path)

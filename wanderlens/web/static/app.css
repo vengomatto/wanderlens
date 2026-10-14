@@ -225,7 +225,7 @@ main {
 }
 
 /* --------------------------------- toolbar --------------------------------- */
-.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
 .toolbar input {
   flex: 1 1 auto;
   max-width: 340px;
@@ -655,7 +655,7 @@ main {
   cursor: pointer;
 }
 .rec-view-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; padding: 0; list-style: none; }
+.rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 1rem; padding: 0; list-style: none; }
 .rec-grid .rec { display: block; }
 .rec-grid .rec-hero { min-height: 180px; }
 .rec-grid .rec-gauge { display: none; }

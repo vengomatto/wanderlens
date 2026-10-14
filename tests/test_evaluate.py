@@ -157,6 +157,9 @@ def test_check_regression():
     assert check_regression(0.5, 0.5) is True
     assert check_regression(0.48, 0.5, 0.05) is True
     assert check_regression(0.4, 0.5, 0.05) is False
+    # A near-zero baseline cannot make the gate unfailable.
+    assert check_regression(0.0, 0.0) is False
+    assert check_regression(0.06, 0.0) is True
 
 
 def test_collapsed_share_and_diagnostics():

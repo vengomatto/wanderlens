@@ -44,7 +44,7 @@
 <section class="card brief-card">
   <h2>Trip brief</h2>
   <p class="muted">Party, pace, range, and season — used to shape recommendations.</p>
-  <form method="post" action="/brief" class="brief-form">
+  <form method="post" action="/brief?token={{ post_token }}" class="brief-form">
     <label>Adults <input type="number" name="adults" min="0" value="{{ view.brief.get('adults', '') }}"></label>
     <label>Children <input type="number" name="children" min="0" value="{{ view.brief.get('children', '') }}"></label>
     <label>Pace
